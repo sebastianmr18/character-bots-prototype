@@ -45,7 +45,13 @@ def initialize_chroma_db():
     """Inicializa ChromaDB, crea una colección y carga documentos PDF."""
     
     # Crea una instancia de ChromaDB local
-    client = chromadb.PersistentClient(path="./chroma_db")
+    #client = chromadb.PersistentClient(path="./chroma_db")
+
+    client = chromadb.CloudClient(
+        api_key=os.getenv("CHROMA_API_KEY"),
+        tenant=os.getenv("CHROMA_TENANT"),
+        database=os.getenv("CHROMA_DATABASE")
+    )
     
     # Usaremos el embedding de all-MiniLM-L6-v2 para los embeddings de Chroma
     # para que Chroma pueda manejar la parte de vectorización.
@@ -54,7 +60,7 @@ def initialize_chroma_db():
     )
 
     # Crea la colección
-    collection_name = "chatbot_rag_docs"
+    collection_name = "sheldon-dataset-rag"
     try:
         client.delete_collection(name=collection_name)
     except:

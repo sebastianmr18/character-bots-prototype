@@ -28,8 +28,8 @@ def generate_audio_from_text(text: str) -> bytes:
         model_id="eleven_multilingual_v2",
         output_format="mp3_44100_128",
     )
-
-    play(audio)
+    audio_bytes = b"".join(audio)
+    return audio_bytes
 
 # Código de prueba
 if __name__ == '__main__':

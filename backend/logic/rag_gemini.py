@@ -6,8 +6,8 @@ from chromadb.utils import embedding_functions
 
 # Configuración
 MODEL_NAME = "gemini-2.5-flash"
-CHROMA_PATH = "./chroma_db"
-COLLECTION_NAME = "chatbot_rag_docs"
+#CHROMA_PATH = "./chroma_db"
+COLLECTION_NAME = "sheldon-dataset-rag"
 
 EMBEDDING_FUNCTION = embedding_functions.SentenceTransformerEmbeddingFunction(
     model_name="all-MiniLM-L6-v2"
@@ -28,7 +28,18 @@ MAX_OUTPUT_TOKENS = 800
 def retrieve_context(query: str) -> str:
     """Busca en ChromaDB el contexto más relevante para la consulta."""
     try:
-        client = chromadb.PersistentClient(path=CHROMA_PATH)
+        '''client = chromadb.PersistentClient(path=CHROMA_PATH)
+        collection = client.get_collection(
+            name=COLLECTION_NAME,
+            embedding_function=EMBEDDING_FUNCTION
+        )'''
+
+        client = chromadb.CloudClient(
+            api_key=os.getenv("CHROMA_API_KEY"),
+            tenant=os.getenv("CHROMA_TENANT"),
+            database=os.getenv("CHROMA_DATABASE")
+        )
+
         collection = client.get_collection(
             name=COLLECTION_NAME,
             embedding_function=EMBEDDING_FUNCTION
@@ -92,7 +103,7 @@ def generate_rag_response(user_query: str) -> str:
 
 # Código de prueba
 if __name__ == '__main__':
-    query = "¿Por que el 73 es tu número favorito?"
+    query = "¿Como ganaste el premio Nobel?"
     response = generate_rag_response(query)
     print("--- RESPUESTA DE SHELDON COOPER CON RAG (MAX 800 TOKENS) ---")
     print(response)
