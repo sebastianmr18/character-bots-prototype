@@ -2,14 +2,27 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
+import { VoiceRecordingModal } from "./VoiceRecordingModal";
+
+// SOLO DESARROLLO
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0,
+      v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 
 // URL del WebSocket
 const WS_URL = "ws://localhost:8000/ws/chat/"
+// 💡 CLAVE DE LOCALSTORAGE
+const CONVERSATION_ID_KEY = "chat_conversation_id"
 
 interface Message {
   id: number
-  sender: "user" | "bot"
-  text: string
+  role: "user" | "assistant"
+  content: string
 }
 
 const ChatInterface: React.FC = () => {
@@ -17,10 +30,19 @@ const ChatInterface: React.FC = () => {
   const [input, setInput] = useState("")
   const [isRecording, setIsRecording] = useState(false)
   const [status, setStatus] = useState("Desconectado")
+  // 💡 Nuevo estado para el ID de la conversación
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [showVoiceModal, setShowVoiceModal] = useState(false)
+  const [voiceTranscription, setVoiceTranscription] = useState("")
+  const [audioLevel, setAudioLevel] = useState(0)
+
+  
   const ws = useRef<WebSocket | null>(null)
   const mediaRecorder = useRef<MediaRecorder | null>(null)
   const audioChunks = useRef<Blob[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const analyser = useRef<AnalyserNode | null>(null)
+  const animationFrameId = useRef<number | null>(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -30,8 +52,51 @@ const ChatInterface: React.FC = () => {
     scrollToBottom()
   }, [messages])
 
-  // 1. CONEXIÓN AL WEBSOCKET
+// ----------------------------------------------------------------------
+// 1. GESTIÓN DEL ID DE CONVERSACIÓN (LOCALSTORAGE)
+// ----------------------------------------------------------------------
   useEffect(() => {
+    let id = localStorage.getItem(CONVERSATION_ID_KEY)
+    
+    if (!id) {
+      // Si no hay ID, generamos uno nuevo y lo guardamos
+      id = generateUUID()
+      localStorage.setItem(CONVERSATION_ID_KEY, id)
+      console.log("Nuevo ID de conversación generado y guardado:", id)
+    } else {
+      console.log("ID de conversación recuperado:", id)
+    }
+    
+    setConversationId(id)
+
+    // Solo se ejecuta al montar el componente, por lo que la dependencia es []
+  }, [])
+
+useEffect(() => {
+  if (!conversationId) return;
+
+  const fetchMessages = async () => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/conversations/${conversationId}/messages/`);
+      if (!response.ok) throw new Error(`Error HTTP ${response.status}`);
+
+      const data = await response.json();
+      console.log("Mensajes previos cargados:", data);
+      if (Array.isArray(data)) setMessages(data);
+    } catch (error) {
+      console.error("Error al cargar mensajes previos:", error);
+    }
+  };
+
+  fetchMessages();
+}, [conversationId]);
+
+// ----------------------------------------------------------------------
+// 2. CONEXIÓN AL WEBSOCKET (Depende del conversationId)
+// ----------------------------------------------------------------------
+  useEffect(() => {
+    if (!conversationId) return // Esperar a que el ID esté listo
+
     ws.current = new WebSocket(WS_URL)
 
     ws.current.onopen = () => {
@@ -48,21 +113,19 @@ const ChatInterface: React.FC = () => {
 
         case "transcription":
           // Añade la transcripción del usuario
-          setMessages((prev) => [...prev, { id: Date.now(), sender: "user", text: data.text }])
+          setMessages((prev) => [...prev, { id: Date.now(), role: "user", content: data.text }])
           console.log("Transcripción recibida")
           break
 
         case "text_response":
           // Añade la respuesta de texto del bot
-          setMessages((prev) => [...prev, { id: Date.now(), sender: "bot", text: data.text }])
+          setMessages((prev) => [...prev, { id: Date.now(), role: "bot", content: data.text }])
           setStatus("Listo")
           console.log("Repuesta de Gemini Escrita")
           break
 
         case "audio_response":
-          // Recibe el audio codificado en Base64
           if (data.audio) {
-            // Reproducir audio inmediatamente sin esperar
             console.log("audio listo")
             playAudio(data.audio)
           }
@@ -70,6 +133,13 @@ const ChatInterface: React.FC = () => {
 
         case "error":
           setStatus(`Error: ${data.message}`)
+          // 💡 Manejar IDs inválidos: Si el backend dice que el ID es inválido, forzar uno nuevo
+          if (data.message.includes("ID de conversación inválido")) {
+            console.error("ID inválido detectado, forzando regeneración.")
+            localStorage.removeItem(CONVERSATION_ID_KEY)
+            setConversationId(null) // Esto forzará la regeneración y reconexión
+            ws.current?.close()
+          }
           break
       }
     }
@@ -84,16 +154,18 @@ const ChatInterface: React.FC = () => {
       setStatus("Error de conexión")
     }
 
-    // Limpieza al desmontar el componente
     return () => {
       ws.current?.close()
     }
-  }, [])
+  }, [conversationId]) // 💡 Dependencia clave: Reconexión si el ID cambia
 
-  // Función para reproducir el audio de Base64
+// ----------------------------------------------------------------------
+// 3. ENVÍO DE MENSAJES (Ahora incluye el conversationId)
+// ----------------------------------------------------------------------
+
+  // Función para reproducir el audio de Base64 (Sin cambios)
   const playAudio = (base64String: string) => {
     const cleanedBase64 = base64String.replace(/\s/g, "")
-
     let binaryString
     try {
       binaryString = atob(cleanedBase64)
@@ -107,49 +179,46 @@ const ChatInterface: React.FC = () => {
     for (let i = 0; i < len; i++) {
       bytes[i] = binaryString.charCodeAt(i)
     }
-
-    // 2. Crear un Blob (archivo binario) y una URL de objeto
-    const audioBlob = new Blob([bytes], { type: "audio/mp3" }) // Asumimos MP3 de ElevenLabs
+    const audioBlob = new Blob([bytes], { type: "audio/mp3" })
     const audioUrl = URL.createObjectURL(audioBlob)
-
-    // 3. Reproducir con configuración para evitar cortes
     const audio = new Audio(audioUrl)
-
-    // Configurar el audio para evitar cortes al inicio
     audio.preload = "auto"
     audio.crossOrigin = "anonymous"
-
-    // Esperar a que el audio esté listo antes de reproducir
     audio.addEventListener(
       "canplaythrough",
       () => {
-        audio.currentTime = 0 // Asegurar que empiece desde el inicio
+        audio.currentTime = 0
         audio.play().catch((e) => {
           console.error("Error al reproducir audio:", e)
         })
       },
       { once: true },
     )
-
-    // Limpiar la URL del objeto después de un tiempo
     setTimeout(() => {
       URL.revokeObjectURL(audioUrl)
-    }, 30000) // 30 segundos
+    }, 30000)
   }
 
-  // 2. ENVÍO DE MENSAJES DE TEXTO
+  // 💡 MODIFICADA: Ahora incluye conversationId
   const sendMessage = (text: string) => {
-    if (!text.trim() || ws.current?.readyState !== WebSocket.OPEN) return
+    if (!text.trim() || ws.current?.readyState !== WebSocket.OPEN || !conversationId) return
 
     // 1. Añade el mensaje del usuario
-    setMessages((prev) => [...prev, { id: Date.now(), sender: "user", text: text }])
+    setMessages((prev) => [...prev, { id: Date.now(), role: "user", content: text }])
     setInput("")
+    console.log("mensajes",messages)
+    console.log(conversationId)
 
-    // 2. Envía a Django
-    ws.current.send(JSON.stringify({ text }))
+    // 2. Envía a Django con el ID de la conversación
+    ws.current.send(
+      JSON.stringify({ 
+        text, 
+        conversation_id: conversationId // 💡 Campo clave
+      })
+    )
   }
 
-  // 3. MANEJO DE GRABACIÓN DE VOZ (Speech-to-Text en el Frontend)
+  // 4. MANEJO DE GRABACIÓN DE VOZ (Speech-to-Text en el Frontend)
   const startRecording = async () => {
     if (!navigator.mediaDevices) {
       alert("Tu navegador no soporta grabación de audio.")
@@ -165,35 +234,50 @@ const ChatInterface: React.FC = () => {
         audioChunks.current.push(event.data)
       }
 
+      // 💡 MODIFICADA: onstop ahora incluye conversationId en el envío
       mediaRecorder.current.onstop = async () => {
         const audioBlob = new Blob(audioChunks.current, { type: "audio/webm" })
 
-        // Convertir audio a Base64 para enviar al backend
         const reader = new FileReader()
         reader.onload = () => {
           const audioBase64 = reader.result as string
-          // Remover el prefijo "data:audio/webm;base64," para obtener solo el Base64
           const base64Data = audioBase64.split(",")[1]
 
-          // Enviar audio al backend para transcripción
-          if (ws.current?.readyState === WebSocket.OPEN) {
+          if (ws.current?.readyState === WebSocket.OPEN && conversationId) {
             ws.current.send(
               JSON.stringify({
                 type: "audio",
                 audio: base64Data,
+                conversation_id: conversationId // 💡 Campo clave
               }),
             )
+          } else if (!conversationId) {
+            console.error("No se pudo enviar el audio: conversationId es nulo.")
           }
         }
         reader.readAsDataURL(audioBlob)
 
-        // Detener las pistas de audio
         stream.getTracks().forEach((track) => track.stop())
+        if (animationFrameId.current) {
+          cancelAnimationFrame(animationFrameId.current)
+        }
       }
 
       mediaRecorder.current.start()
       setIsRecording(true)
+      setShowVoiceModal(true)
       setStatus("Grabando voz...")
+
+      const updateLevel = () => {
+        if (analyser.current) {
+          const dataArray = new Uint8Array(analyser.current.frequencyBinCount)
+          analyser.current.getByteFrequencyData(dataArray)
+          const average = dataArray.reduce((a, b) => a + b) / dataArray.length
+          setAudioLevel(Math.min(average / 255, 1))
+        }
+        animationFrameId.current = requestAnimationFrame(updateLevel)
+      }
+      updateLevel()
     } catch (err) {
       console.error("Error al acceder al micrófono:", err)
       alert("Necesitas dar permiso al micrófono.")
@@ -206,6 +290,22 @@ const ChatInterface: React.FC = () => {
     setStatus("Procesando audio...")
   }
 
+  const handleSendVoiceMessage = () => {
+    if (voiceTranscription.trim()) {
+      sendMessage(voiceTranscription)
+      setVoiceTranscription("")
+      setShowVoiceModal(false)
+      setAudioLevel(0)
+    }
+  }
+
+  const handleCloseVoiceModal = () => {
+    setShowVoiceModal(false)
+    setVoiceTranscription("")
+    setAudioLevel(0)
+  }
+
+  // ... (getStatusDisplay y Renderizado sin cambios, excepto por la habilitación)
   const getStatusDisplay = () => {
     switch (status) {
       case "Conectado":
@@ -222,19 +322,20 @@ const ChatInterface: React.FC = () => {
   }
 
   const statusDisplay = getStatusDisplay()
-  const isConnected = ws.current?.readyState === WebSocket.OPEN
+  // 💡 Añadimos la verificación del conversationId a la conexión
+  const isConnected = ws.current?.readyState === WebSocket.OPEN && conversationId !== null
 
   // 4. Renderizado
   return (
     <div
       className="mx-auto max-w-2xl h-[700px] flex flex-col rounded-2xl border border-gray-200 shadow-2xl 
-                    bg-white dark:bg-gray-900 dark:border-gray-700 
-                    text-gray-900 dark:text-gray-100 transition-all duration-300 overflow-hidden"
+                   bg-white dark:bg-gray-900 dark:border-gray-700 
+                   text-gray-900 dark:text-gray-100 transition-all duration-300 overflow-hidden"
     >
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold mb-1">Asistente de Programación</h1>
+            <h1 className="text-2xl font-bold mb-1">Habla con Sheldon Cooper!</h1>
             <p className="text-sm text-blue-100">Prototipo con RAG y ElevenLabs</p>
           </div>
 
@@ -246,6 +347,7 @@ const ChatInterface: React.FC = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50 dark:bg-gray-800/50">
+        {/* ... (Mensajes de chat) ... */}
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="w-16 h-16 mb-4 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
@@ -266,37 +368,39 @@ const ChatInterface: React.FC = () => {
             <h3 className="text-lg font-semibold mb-2 text-gray-700 dark:text-gray-300">¡Comienza la conversación!</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm">
               Escribe tu pregunta de programación o usa el micrófono para hablar con el asistente.
+              {/* 💡 Muestra el ID para debugging */}
+              {conversationId && <div className="mt-2 text-xs opacity-50">ID: {conversationId.substring(0, 8)}...</div>} 
             </p>
           </div>
         ) : (
           messages.map((msg) => (
             <div
               key={msg.id}
-              className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-2 duration-300`}
+              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-2 duration-300`}
             >
               <div
-                className={`flex items-end gap-2 max-w-[85%] ${msg.sender === "user" ? "flex-row-reverse" : "flex-row"}`}
+                className={`flex items-end gap-2 max-w-[85%] ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
               >
                 <div
                   className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold
                   ${
-                    msg.sender === "user"
+                    msg.role === "user"
                       ? "bg-blue-600 text-white"
                       : "bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200"
                   }`}
                 >
-                  {msg.sender === "user" ? "TÚ" : "AI"}
+                  {msg.role === "user" ? "TÚ" : "AI"}
                 </div>
 
                 <div
                   className={`py-3 px-4 rounded-2xl shadow-md transition-all duration-200 hover:shadow-lg
                   ${
-                    msg.sender === "user"
+                    msg.role === "user"
                       ? "bg-blue-600 text-white rounded-br-sm"
                       : "bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-sm border border-gray-200 dark:border-gray-600"
                   }`}
                 >
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
                 </div>
               </div>
             </div>
@@ -319,13 +423,13 @@ const ChatInterface: React.FC = () => {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Escribe tu pregunta de programación..."
-              disabled={isRecording || !isConnected}
+              disabled={isRecording || !isConnected} // 💡 Deshabilitado si el ID no está listo
               className="w-full p-3 pr-12 rounded-xl border-2 border-gray-200 
-                       focus:border-blue-500 focus:ring-2 focus:ring-blue-200 
-                       dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 
-                       dark:focus:border-blue-400 dark:focus:ring-blue-900/30
-                       disabled:opacity-50 disabled:cursor-not-allowed
-                       transition-all duration-200 outline-none"
+                         focus:border-blue-500 focus:ring-2 focus:ring-blue-200 
+                         dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 
+                         dark:focus:border-blue-400 dark:focus:ring-blue-900/30
+                         disabled:opacity-50 disabled:cursor-not-allowed
+                         transition-all duration-200 outline-none"
             />
             {input.length > 0 && (
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">{input.length}</span>
@@ -334,12 +438,12 @@ const ChatInterface: React.FC = () => {
 
           <button
             type="submit"
-            disabled={!input.trim() || isRecording || !isConnected}
+            disabled={!input.trim() || isRecording || !isConnected} // 💡 Deshabilitado si el ID no está listo
             className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold 
-                     hover:bg-blue-700 active:scale-95
-                     disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600
-                     transition-all duration-200 shadow-md hover:shadow-lg
-                     flex items-center gap-2"
+                       hover:bg-blue-700 active:scale-95
+                       disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600
+                       transition-all duration-200 shadow-md hover:shadow-lg
+                       flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -350,7 +454,7 @@ const ChatInterface: React.FC = () => {
 
         <button
           onClick={isRecording ? stopRecording : startRecording}
-          disabled={!isConnected}
+          disabled={!isConnected} // 💡 Deshabilitado si el ID no está listo
           className={`w-full p-4 rounded-xl font-semibold text-white transition-all duration-300 
             flex items-center justify-center gap-3 shadow-md hover:shadow-lg active:scale-[0.98]
             ${
@@ -391,6 +495,15 @@ const ChatInterface: React.FC = () => {
           Transcripción de voz con ElevenLabs • Respuestas con audio incluido
         </p>
       </div>
+
+      {/*<VoiceRecordingModal
+        isOpen={showVoiceModal}
+        isRecording={isRecording}
+        audioLevel={audioLevel}
+        transcription={voiceTranscription}
+        onClose={handleCloseVoiceModal}
+        onSend={handleSendVoiceMessage}
+      />*/}
     </div>
   )
 }

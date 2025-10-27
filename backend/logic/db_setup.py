@@ -53,7 +53,7 @@ def initialize_chroma_db():
         database=os.getenv("CHROMA_DATABASE")
     )
     
-    # Usaremos el embedding de all-MiniLM-L6-v2 para los embeddings de Chroma
+    # Embedding de all-MiniLM-L6-v2 para los embeddings de Chroma
     # para que Chroma pueda manejar la parte de vectorización.
     embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
         model_name="all-MiniLM-L6-v2"

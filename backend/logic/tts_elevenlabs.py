@@ -24,7 +24,8 @@ def generate_audio_from_text(text: str) -> bytes:
     
     audio = elevenlabs_client.text_to_speech.convert(
         text=text,
-        voice_id="JBFqnCBsd6RMkjVDRZzb",
+        #voice_id="JBFqnCBsd6RMkjVDRZzb",
+        voice_id="y68ZZ8pZ68CAS6iOCIDB", #Voz clonada
         model_id="eleven_multilingual_v2",
         output_format="mp3_44100_128",
     )

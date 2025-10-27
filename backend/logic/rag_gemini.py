@@ -3,6 +3,7 @@ import chromadb
 from google import genai
 from google.genai.errors import APIError
 from chromadb.utils import embedding_functions
+from django.shortcuts import get_object_or_404
 
 # Configuración
 MODEL_NAME = "gemini-2.5-flash"
@@ -20,7 +21,7 @@ SYSTEM_PROMPT_SHELDON = (
     "para responder preguntas sobre tu trasfondo o la configuración del chatbot. "
     "Si el contexto no es suficiente para responder la pregunta, declara que "
     "la pregunta es trivial, irrelevante o una 'falacia lógica'. "
-    "¡Y por favor, sé breve!"
+    "¡Y por favor, sé breve! NO repitas el historial de chat."
 )
 
 MAX_OUTPUT_TOKENS = 800
@@ -60,7 +61,7 @@ def retrieve_context(query: str) -> str:
         print(f"Error al buscar en Chroma: {e}")
         return "" # Retorna vacío si falla la búsqueda
 
-def generate_rag_response(user_query: str) -> str:
+def generate_rag_response(user_query: str, history: list[dict]) -> str:
     """Combina RAG con Gemini 2.5 Flash para generar una respuesta."""
     try:
         # Inicializa el cliente de Gemini
@@ -69,20 +70,35 @@ def generate_rag_response(user_query: str) -> str:
         # 1. Obtiene el contexto de RAG
         context = retrieve_context(user_query)
 
+        # 2. Obtiene historial de chat:
+        # El formato de Gemini API espera una lista de objetos de mensaje,
+        # pero como estamos usando RAG, lo concatenaremos en el prompt de forma sencilla.
+        
+        # 💡 Creación del bloque de historial
+        chat_history_str = ""
+        if history:
+            chat_history_str = "Historial de la Conversación:\n---\n"
+            for msg in history:
+                # Usamos el rol para diferenciar, el último mensaje es el actual
+                chat_history_str += f"[{msg['role'].upper()}]: {msg['content']}\n"
+            chat_history_str += "---\n"
+
         # 2. Crea el prompt final
         if context:
-            system_instruction = SYSTEM_PROMPT_SHELDON
             prompt = (
-                f"Contexto relevante:\n---\n{context}\n---\n"
+                f"{chat_history_str}"
+                f"Contexto relevante RAG:\n---\n{context}\n---\n"
                 f"Pregunta del usuario: {user_query}"
             )
+            system_instruction = SYSTEM_PROMPT_SHELDON
         else:
-            # Si RAG falla, responde directamente (sin contexto)
+            # Si RAG falla, responde con el historial y conocimiento general
             system_instruction = SYSTEM_PROMPT_SHELDON + (
-                " Responde solo en base a tu conocimiento general de Sheldon Cooper, "
+                " Responde solo en base a tu conocimiento general de Sheldon Cooper y el historial, "
                 "ya que el contexto específico no está disponible."
             )
-            prompt = user_query
+            # 💡 Incluye el historial en el prompt
+            prompt = f"{chat_history_str}Pregunta del usuario: {user_query}"
 
         # 3. Llama a la API de Gemini
         response = client.models.generate_content(
