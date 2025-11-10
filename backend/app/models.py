@@ -1,6 +1,35 @@
 from django.db import models
 import uuid
 
+class Character(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    name = models.CharField(max_length=100, help_text="Nombre del personaje.")
+    role = models.CharField(max_length=100, help_text="Rol o descripción del personaje.")
+    biography = models.TextField(help_text="Trasfondo corto, personalidad general.")
+
+    key_traits = models.JSONField(
+        default=list, 
+        blank=True, 
+        help_text="Lista de rasgos clave (ej. ['Lógico', 'Sarcástico', 'Obsesivo'])"
+    )
+    speech_tics = models.JSONField(
+        default=list, 
+        blank=True, 
+        help_text="Muletillas o frases comunes (ej. ['Bazinga!', 'Interesante.', 'Eso es mi sitio.'])"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Personaje"
+        verbose_name_plural = "Personajes"
+        ordering = ['-created_at']
+
+
+    def __str__(self):
+        return self.name
+
 # Create your models here.
 class Conversation(models.Model):
     # Campo clave que usaremos para que coincida con el ID de localStorage.
@@ -18,6 +47,15 @@ class Conversation(models.Model):
     
     # Metadatos
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # Si un personaje se borra, la conversación no (SET_NULL).
+    character = models.ForeignKey(
+        Character,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True, # Permitir nulo por ahora
+        related_name='conversations'
+    )
     
     class Meta:
         verbose_name = "Conversación"

@@ -10,12 +10,12 @@ from logic.rag_gemini import generate_rag_response
 from logic.tts_elevenlabs import generate_audio_from_text
 from logic.stt_elevenlabs import transcribe_audio_from_base64 
 
-from app.models import Conversation, Message 
+from app.models import Conversation, Message, Character
 
 MAX_HISTORY_MESSAGES = 10 # Los últimos 10 mensajes (5 turnos completos)
 
 @sync_to_async
-def get_or_create_conversation_and_history(conversation_id_str):
+def get_or_create_conversation_and_history(conversation_id_str, character_id_str):
     """Busca o crea la conversación y recupera el historial reciente."""
     
     # 1. Validar UUID
@@ -27,12 +27,52 @@ def get_or_create_conversation_and_history(conversation_id_str):
     try:
         # Intentamos obtener o crear la conversación con el ID enviado por el frontend
         conversation_uuid = uuid.UUID(conversation_id_str)
-        conversation, created = Conversation.objects.get_or_create(id=conversation_uuid)
+        conversation, created = Conversation.objects.select_related('character').get_or_create(id=conversation_uuid)
     except ValueError:
         # Si el string no es un UUID válido
         raise ValidationError("El ID de conversación no tiene el formato UUID correcto.")
         
-    # 3. Obtener el historial de la ventana deslizante
+
+    # 3. Asignar personaje si es una conversación nueva
+    character = conversation.character
+
+    # Caso: Conversación es nueva O no tiene personaje asignado AÚN
+    if created or not character:
+        # Si no tiene personaje (nuevo o antiguo sin asignar),
+        # asigna el PRIMER personaje que encuentre como default.
+        # TODO: A futuro, el frontend debería enviar un 'character_id'
+
+        # intentar usar el character_id_str enviado por el frontend
+        if character_id_str:
+            try:
+                character_uuid = uuid.UUID(character_id_str)
+                new_character = Character.objects.get(id=character_uuid)
+                
+                # Asignar y guardar
+                conversation.character = new_character
+                conversation.save()
+                character = new_character # Usar el nuevo personaje
+                
+            except (ValueError, ObjectDoesNotExist):
+                # Si el character_id es inválido o no existe, intentar el default
+                print(f"AVISO: character_id '{character_id_str}' es inválido o no existe. Intentando default.")
+                
+        # Segundo, si la asignación falló (o no se envió ID), usar el default (Character.objects.first())
+        if not conversation.character: # Chequea de nuevo si sigue siendo None
+            try:
+                default_character = Character.objects.first()
+                if default_character:
+                    conversation.character = default_character
+                    conversation.save()
+                    character = default_character
+                else:
+                    print("ERROR: No se encontraron personajes en la base de datos.")
+                    # Si no hay personajes, 'character' es None
+            except Exception as e:
+                print(f"Error al asignar personaje default: {e}")
+                character = None
+
+    # 4. Obtener el historial de la ventana deslizante
     # Recuperamos los últimos N mensajes, excluyendo el mensaje actual
     history_qs = conversation.messages.all().order_by('-timestamp')[:MAX_HISTORY_MESSAGES]
     
@@ -42,7 +82,7 @@ def get_or_create_conversation_and_history(conversation_id_str):
         for m in reversed(history_qs) # Se invierte para que el más antiguo vaya primero
     ]
     
-    return conversation, history
+    return conversation, history, character
 
 @sync_to_async
 def save_messages(conversation, user_text, llm_response_text):
@@ -92,11 +132,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
     # 3. RECEPCIÓN DE MENSAJE DEL CLIENTE
     async def receive(self, text_data):
         """Llamado cuando se recibe un mensaje del cliente."""
+        print(f"handle_text_message recibido: {text_data}")
         text_data_json = json.loads(text_data)
-        message_type = text_data_json.get('type', 'text')
+        message_type = text_data_json.get('type')
         
         # 💡 Aseguramos que el conversation_id siempre esté presente
         conversation_id = text_data_json.get('conversation_id')
+        character_id = text_data_json.get('character_id')  # Actualmente no usado
+
         if not conversation_id:
             await self.send(text_data=json.dumps({
                 'type': 'error',
@@ -106,16 +149,27 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # Guardamos el ID en el consumer para uso posterior
         self.conversation_id = conversation_id
+        self.character_id = character_id  # Actualmente no usado
 
-        if message_type == 'audio':
+        if message_type == 'audio' and 'audio' in text_data_json:
             # Manejar audio del frontend
             await self.handle_audio_message(text_data_json)
-        else:
+        elif message_type == 'text' and 'text' in text_data_json:
             # Manejar texto del frontend (comportamiento original)
             await self.handle_text_message(text_data_json)
+        elif message_type == 'init':
+            # Mensaje de inicialización, no hacer nada especial por ahora
+            await self.send(text_data=json.dumps({
+                'type': 'status',
+                'message': 'Sesión iniciada correctamente.'
+            }))
+        else:
+            # Tipo de mensaje desconocido o datos faltantes
+            print(f"Mensaje WS ignorado: Tipo '{message_type}' o faltan datos.")
     
     async def handle_text_message(self, text_data_json):
         """Maneja mensajes de texto del frontend."""
+        print(f"handle_text_message recibido: {text_data_json}")
         user_text = text_data_json['text']
         
         # Le indicamos al cliente que la respuesta está siendo procesada
@@ -126,13 +180,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         try:
             # 💡 1. Obtener Conversación e Historial (Persistencia y Contexto)
-            conversation, history = await get_or_create_conversation_and_history(self.conversation_id)
+            conversation, history, character = await get_or_create_conversation_and_history(self.conversation_id, self.character_id)
 
             # 💡 2. Obtener Respuesta con RAG/Gemini/TTS, pasando el historial
             gemini_response_text, audio_data_base64 = await sync_to_async(
                 self.get_rag_gemini_tts_response, 
                 thread_sensitive=True
-            )(user_text, history) # 💡 Se pasa el historial
+            )(user_text, history, character) # 💡 Se pasa el historial
 
             # 💡 3. Guardar Mensajes (Persistencia)
             await save_messages(conversation, user_text, gemini_response_text)
@@ -210,13 +264,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }))
 
             # 💡 1. Obtener Conversación e Historial (Persistencia y Contexto)
-            conversation, history = await get_or_create_conversation_and_history(self.conversation_id) # 💡 NUEVO
+            conversation, history, character = await get_or_create_conversation_and_history(self.conversation_id, self.character_id) # 💡 NUEVO
             
             # 💡 2. Procesar la transcripción con RAG + Gemini + TTS, pasando el historial
             gemini_response_text, audio_data_base64 = await sync_to_async(
                 self.get_rag_gemini_tts_response, 
                 thread_sensitive=True
-            )(transcribed_text, history) # 💡 Se pasa el historial
+            )(transcribed_text, history, character) # 💡 Se pasa el historial
 
             # 💡 3. Guardar Mensajes (Persistencia)
             await save_messages(conversation, transcribed_text, gemini_response_text) # 💡 NUEVO
@@ -266,14 +320,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }))
 
     # FUNCIÓN DE LÓGICA DE NEGOCIO (SINCRONA)
-    def get_rag_gemini_tts_response(self, user_text, history):
+    def get_rag_gemini_tts_response(self, user_text, history, character):
         """
         Función síncrona que coordina RAG, Gemini y TTS, usando historial.
         """
         
         # --- 1. RAG y Generación con Gemini ---
         try:
-            gemini_response_text = generate_rag_response(user_text, history)
+            gemini_response_text = generate_rag_response(user_text, history, character)
         except Exception as e:
             print(f"Error en RAG/Gemini: {e}")
             gemini_response_text = "Disculpa, hubo un problema al procesar tu solicitud con el modelo de IA."

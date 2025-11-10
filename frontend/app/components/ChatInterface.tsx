@@ -4,9 +4,8 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { VoiceRecordingModal } from "./VoiceRecordingModal";
 
-// SOLO DESARROLLO
 const generateUUID = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     var r = Math.random() * 16 | 0,
       v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
@@ -14,15 +13,21 @@ const generateUUID = () => {
 };
 
 
-// URL del WebSocket
+// URL del WebSocket desarrollo
 const WS_URL = "ws://localhost:8000/ws/chat/"
-// 💡 CLAVE DE LOCALSTORAGE
-const CONVERSATION_ID_KEY = "chat_conversation_id"
+
+const CONVERSATION_ID_PREFIX = "chat_id_char_"
 
 interface Message {
   id: number
   role: "user" | "assistant"
   content: string
+}
+
+interface Character {
+  id: string;
+  name: string;
+  description: string;
 }
 
 const ChatInterface: React.FC = () => {
@@ -32,11 +37,16 @@ const ChatInterface: React.FC = () => {
   const [status, setStatus] = useState("Desconectado")
   // 💡 Nuevo estado para el ID de la conversación
   const [conversationId, setConversationId] = useState<string | null>(null)
+
+  // 💡 ESTADOS PARA SELECCIÓN DE PERSONAJE
+  const [availableCharacters, setAvailableCharacters] = useState<Character[]>([]);
+  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
+
   const [showVoiceModal, setShowVoiceModal] = useState(false)
   const [voiceTranscription, setVoiceTranscription] = useState("")
   const [audioLevel, setAudioLevel] = useState(0)
 
-  
+
   const ws = useRef<WebSocket | null>(null)
   const mediaRecorder = useRef<MediaRecorder | null>(null)
   const audioChunks = useRef<Blob[]>([])
@@ -52,55 +62,132 @@ const ChatInterface: React.FC = () => {
     scrollToBottom()
   }, [messages])
 
-// ----------------------------------------------------------------------
-// 1. GESTIÓN DEL ID DE CONVERSACIÓN (LOCALSTORAGE)
-// ----------------------------------------------------------------------
-  useEffect(() => {
-    let id = localStorage.getItem(CONVERSATION_ID_KEY)
-    
-    if (!id) {
-      // Si no hay ID, generamos uno nuevo y lo guardamos
-      id = generateUUID()
-      localStorage.setItem(CONVERSATION_ID_KEY, id)
-      console.log("Nuevo ID de conversación generado y guardado:", id)
-    } else {
-      console.log("ID de conversación recuperado:", id)
-    }
-    
-    setConversationId(id)
+  // ----------------------------------------------------------------------
+  // 1. GESTIÓN DEL ID DE CONVERSACIÓN (LOCALSTORAGE) // en el futuro debe hacerse con auth
+  // ----------------------------------------------------------------------
+useEffect(() => {
+    if (!selectedCharacterId) return;
 
-    // Solo se ejecuta al montar el componente, por lo que la dependencia es []
+    // Generar una clave única para localStorage
+    const STORAGE_KEY = CONVERSATION_ID_PREFIX + selectedCharacterId;
+    
+    let id = localStorage.getItem(STORAGE_KEY);
+
+    if (!id) {
+        // Generar un ID nuevo si no hay uno para este personaje
+        id = generateUUID();
+        localStorage.setItem(STORAGE_KEY, id);
+        console.log(`Nuevo ID (${id}) generado para personaje: ${selectedCharacterId}`);
+    } else {
+        console.log(`ID (${id}) recuperado para personaje: ${selectedCharacterId}`);
+    }
+
+    setConversationId(id);
+    setMessages([]);
+
+    // Lógica de carga de mensajes con el ID único
+    const fetchMessages = async (currentId: string) => {
+        try {
+            const response = await fetch(`http://localhost:8000/api/conversations/${currentId}/messages/?character_id=${selectedCharacterId}`);
+            
+            if (!response.ok && response.status !== 404) throw new Error(`Error HTTP ${response.status}`);
+
+            if (response.status === 404) {
+                 console.log("No hay historial, comenzando nuevo chat.");
+                 return;
+            }
+
+            const data = await response.json();
+            console.log("Mensajes previos cargados:", data);
+            if (Array.isArray(data)) setMessages(data);
+            scrollToBottom();
+
+        } catch (error) {
+            console.error("Error al cargar mensajes previos:", error);
+            setMessages([]);
+        }
+    };
+    
+    // Llamar a fetchMessages con el ID que acabamos de obtener/generar
+    fetchMessages(id); 
+
+    // Manejo del WebSocket (cerrar y dejar que el siguiente useEffect se reconecte)
+    ws.current?.close();
+
+}, [selectedCharacterId]);
+
+  // Logica de crear y/o traer personaje
+
+  useEffect(() => {
+    const fetchCharacters = async () => {
+      try {
+        // Endpoint necesario
+        const response = await fetch(`http://localhost:8000/api/characters/`);
+        if (!response.ok) throw new Error(`Error HTTP ${response.status}`);
+
+        const data: Character[] = await response.json();
+        setAvailableCharacters(data);
+
+        if (data.length > 0) {
+          const storedCharacterId = localStorage.getItem("selected_character_id");
+          const initialCharacterId = storedCharacterId && data.find(c => c.id === storedCharacterId)
+            ? storedCharacterId
+            : data[0].id;
+          setSelectedCharacterId(initialCharacterId);
+          localStorage.setItem("selected_character_id", initialCharacterId);
+        }
+      } catch (error) {
+        console.error("Error al cargar personajes:", error);
+      }
+    }
+    fetchCharacters();
   }, [])
 
-useEffect(() => {
-  if (!conversationId) return;
-
-  const fetchMessages = async () => {
-    try {
-      const response = await fetch(`http://localhost:8000/api/conversations/${conversationId}/messages/`);
-      if (!response.ok) throw new Error(`Error HTTP ${response.status}`);
-
-      const data = await response.json();
-      console.log("Mensajes previos cargados:", data);
-      if (Array.isArray(data)) setMessages(data);
-    } catch (error) {
-      console.error("Error al cargar mensajes previos:", error);
-    }
-  };
-
-  fetchMessages();
-}, [conversationId]);
-
-// ----------------------------------------------------------------------
-// 2. CONEXIÓN AL WEBSOCKET (Depende del conversationId)
-// ----------------------------------------------------------------------
+  // Logica para resetear chat al cambiar personaje
   useEffect(() => {
-    if (!conversationId) return // Esperar a que el ID esté listo
+    if (!conversationId || !selectedCharacterId) return;
+
+    const fetchMessages = async () => {
+      try {
+        const response = await fetch(`http://localhost:8000/api/conversations/${conversationId}/messages/?character_id=${selectedCharacterId}`);
+        if (!response.ok) {
+          setMessages([]); // Si hay error, asumimos que no hay mensajes
+          return;
+        }
+
+        const data = await response.json();
+        console.log("Mensajes previos cargados:", data);
+        if (Array.isArray(data)) setMessages(data);
+      } catch (error) {
+        console.error("Error al cargar mensajes previos:", error);
+        setMessages([]);
+      }
+    };
+
+    fetchMessages();
+
+    // Cierra y reabre el WS si el ID de personaje cambia para asegurar la configuración correcta en el consumidor
+    ws.current?.close();
+  }, [conversationId, selectedCharacterId]);
+
+  // ----------------------------------------------------------------------
+  // 2. CONEXIÓN AL WEBSOCKET (Depende del conversationId)
+  // ----------------------------------------------------------------------
+  useEffect(() => {
+    if (!conversationId || !selectedCharacterId) return // Esperar a que el ID esté listo
 
     ws.current = new WebSocket(WS_URL)
+    setStatus("Conectando...")
 
     ws.current.onopen = () => {
       setStatus("Conectado")
+      ws.current?.send(
+        JSON.stringify({
+          type: "init",
+          conversation_id: conversationId,
+          character_id: selectedCharacterId
+        })
+      )
     }
 
     ws.current.onmessage = (event) => {
@@ -136,7 +223,8 @@ useEffect(() => {
           // 💡 Manejar IDs inválidos: Si el backend dice que el ID es inválido, forzar uno nuevo
           if (data.message.includes("ID de conversación inválido")) {
             console.error("ID inválido detectado, forzando regeneración.")
-            localStorage.removeItem(CONVERSATION_ID_KEY)
+            const DYNAMIC_CONV_KEY = CONVERSATION_ID_PREFIX + selectedCharacterId;
+            localStorage.removeItem(DYNAMIC_CONV_KEY)
             setConversationId(null) // Esto forzará la regeneración y reconexión
             ws.current?.close()
           }
@@ -157,11 +245,11 @@ useEffect(() => {
     return () => {
       ws.current?.close()
     }
-  }, [conversationId]) // 💡 Dependencia clave: Reconexión si el ID cambia
+  }, [conversationId, selectedCharacterId]) // 💡 Dependencia clave: Reconexión si el ID cambia
 
-// ----------------------------------------------------------------------
-// 3. ENVÍO DE MENSAJES (Ahora incluye el conversationId)
-// ----------------------------------------------------------------------
+  // ----------------------------------------------------------------------
+  // 3. ENVÍO DE MENSAJES (Ahora incluye el conversationId)
+  // ----------------------------------------------------------------------
 
   // Función para reproducir el audio de Base64 (Sin cambios)
   const playAudio = (base64String: string) => {
@@ -199,21 +287,21 @@ useEffect(() => {
     }, 30000)
   }
 
-  // 💡 MODIFICADA: Ahora incluye conversationId
+  // 💡 MODIFICADA: Ahora incluye conversationId y characterId
   const sendMessage = (text: string) => {
-    if (!text.trim() || ws.current?.readyState !== WebSocket.OPEN || !conversationId) return
+    if (!text.trim() || ws.current?.readyState !== WebSocket.OPEN || !conversationId || !selectedCharacterId) return
 
     // 1. Añade el mensaje del usuario
     setMessages((prev) => [...prev, { id: Date.now(), role: "user", content: text }])
     setInput("")
-    console.log("mensajes",messages)
-    console.log(conversationId)
 
     // 2. Envía a Django con el ID de la conversación
     ws.current.send(
-      JSON.stringify({ 
-        text, 
-        conversation_id: conversationId // 💡 Campo clave
+      JSON.stringify({
+        type: "text",
+        text,
+        conversation_id: conversationId,
+        character_id: selectedCharacterId
       })
     )
   }
@@ -243,16 +331,17 @@ useEffect(() => {
           const audioBase64 = reader.result as string
           const base64Data = audioBase64.split(",")[1]
 
-          if (ws.current?.readyState === WebSocket.OPEN && conversationId) {
+          if (ws.current?.readyState === WebSocket.OPEN && conversationId && selectedCharacterId) {
             ws.current.send(
               JSON.stringify({
                 type: "audio",
                 audio: base64Data,
-                conversation_id: conversationId // 💡 Campo clave
+                conversation_id: conversationId,
+                character_id: selectedCharacterId
               }),
             )
-          } else if (!conversationId) {
-            console.error("No se pudo enviar el audio: conversationId es nulo.")
+          } else if (!conversationId || !selectedCharacterId) {
+            console.error("No se pudo enviar el audio: IDs nulos.")
           }
         }
         reader.readAsDataURL(audioBlob)
@@ -323,7 +412,7 @@ useEffect(() => {
 
   const statusDisplay = getStatusDisplay()
   // 💡 Añadimos la verificación del conversationId a la conexión
-  const isConnected = ws.current?.readyState === WebSocket.OPEN && conversationId !== null
+  const isConnected = ws.current?.readyState === WebSocket.OPEN && conversationId !== null && selectedCharacterId !== null
 
   // 4. Renderizado
   return (
@@ -343,6 +432,36 @@ useEffect(() => {
             <span className={`${statusDisplay.color} text-xs animate-pulse`}>{statusDisplay.icon}</span>
             <span className={`text-sm font-medium ${statusDisplay.color}`}>{status}</span>
           </div>
+        </div>
+      </div>
+
+      {/* 💡 Selector de Personaje */}
+      <div className="mt-4 flex items-center gap-3">
+        <label htmlFor="character-select" className="text-sm font-medium text-blue-100">Personaje:</label>
+        <select
+          id="character-select"
+          value={selectedCharacterId || ""}
+          onChange={(e) => {
+            const newId = e.target.value;
+            setSelectedCharacterId(newId);
+            localStorage.setItem("selected_character_id", newId);
+          }}
+          disabled={availableCharacters.length === 0}
+          className="bg-white/20 border border-white/30 text-white text-sm rounded-lg 
+                       focus:ring-blue-300 focus:border-blue-300 block p-2.5 
+                       dark:bg-gray-800/50 dark:border-gray-600 dark:text-gray-100"
+        >
+          {availableCharacters.length === 0 && <option value="">Cargando...</option>}
+          {availableCharacters.map(char => (
+            <option key={char.id} value={char.id}>
+              {char.name}
+            </option>
+          ))}
+        </select>
+
+        <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${statusDisplay.bg} backdrop-blur-sm`}>
+          <span className={`${statusDisplay.color} text-xs animate-pulse`}>{statusDisplay.icon}</span>
+          <span className={`text-sm font-medium ${statusDisplay.color}`}>{status}</span>
         </div>
       </div>
 
@@ -367,10 +486,10 @@ useEffect(() => {
             </div>
             <h3 className="text-lg font-semibold mb-2 text-gray-700 dark:text-gray-300">¡Comienza la conversación!</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm">
-              Escribe tu pregunta de programación o usa el micrófono para hablar con el asistente.
+              Estás hablando con <span className="font-bold">{availableCharacters.find(c => c.id === selectedCharacterId)?.name || '...'}</span>.
               {/* 💡 Muestra el ID para debugging */}
-              {conversationId && <div className="mt-2 text-xs opacity-50">ID: {conversationId.substring(0, 8)}...</div>} 
             </p>
+              {conversationId && <div className="mt-2 text-xs opacity-50">ID Conversación: {conversationId.substring(0, 8)}...</div>}
           </div>
         ) : (
           messages.map((msg) => (
@@ -383,22 +502,20 @@ useEffect(() => {
               >
                 <div
                   className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold
-                  ${
-                    msg.role === "user"
+                  ${msg.role === "user"
                       ? "bg-blue-600 text-white"
                       : "bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200"
-                  }`}
+                    }`}
                 >
                   {msg.role === "user" ? "TÚ" : "AI"}
                 </div>
 
                 <div
                   className={`py-3 px-4 rounded-2xl shadow-md transition-all duration-200 hover:shadow-lg
-                  ${
-                    msg.role === "user"
+                  ${msg.role === "user"
                       ? "bg-blue-600 text-white rounded-br-sm"
                       : "bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-sm border border-gray-200 dark:border-gray-600"
-                  }`}
+                    }`}
                 >
                   <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
                 </div>
@@ -422,7 +539,7 @@ useEffect(() => {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Escribe tu pregunta de programación..."
+              placeholder={`Habla con ${availableCharacters.find(c => c.id === selectedCharacterId)?.name || 'el asistente'}...`}
               disabled={isRecording || !isConnected} // 💡 Deshabilitado si el ID no está listo
               className="w-full p-3 pr-12 rounded-xl border-2 border-gray-200 
                          focus:border-blue-500 focus:ring-2 focus:ring-blue-200 
@@ -457,10 +574,9 @@ useEffect(() => {
           disabled={!isConnected} // 💡 Deshabilitado si el ID no está listo
           className={`w-full p-4 rounded-xl font-semibold text-white transition-all duration-300 
             flex items-center justify-center gap-3 shadow-md hover:shadow-lg active:scale-[0.98]
-            ${
-              isRecording
-                ? "bg-red-500 hover:bg-red-600 animate-pulse"
-                : "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
+            ${isRecording
+              ? "bg-red-500 hover:bg-red-600 animate-pulse"
+              : "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
             } 
             disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-green-500 disabled:hover:to-green-600`}
         >
