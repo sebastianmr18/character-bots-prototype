@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
+import { useTheme } from "@/app/providers"
 import { VoiceRecordingModal } from "./VoiceRecordingModal";
 import { useCharacters } from "@/hooks/useCharacters";
 import { useConversationId } from "@/hooks/useConversationId";
@@ -13,9 +14,12 @@ import { StatusIndicator } from "@/components/ui/features/chat-interface/StatusI
 import { ChatInput } from "@/components/ui/features/chat-interface/ChatInput";
 import { ChatMessages } from "@/components/ui/features/chat-interface/ChatMessages";
 import { VoiceRecordingButton } from "@/components/ui/features/chat-interface/VoiceRecordingButton";
+import { Button } from "@/components/ui/button"
+import { Moon, Sun } from 'lucide-react'
 
 const ChatInterface: React.FC = () => {
   const [status, setStatus] = useState("Desconectado")
+  const { theme, toggleTheme } = useTheme()
   const { availableCharacters, selectedCharacterId, handleCharacterChange } = useCharacters()
   const { conversationId, messages, setMessages } = useConversationId(selectedCharacterId)
 
@@ -67,9 +71,9 @@ const ChatInterface: React.FC = () => {
     <div className="flex w-full min-h-screen">
 
       <CharacterSidebar
-        characters={availableCharacters}
+        availableCharacters={availableCharacters}
         selectedCharacterId={selectedCharacterId}
-        onCharacterSelect={handleCharacterChange}/>
+        onCharacterChange={handleCharacterChange}/>
 
 <div
   className="w-full min-h-screen flex flex-col rounded-2xl border border-gray-200 shadow-2xl 
@@ -84,6 +88,19 @@ const ChatInterface: React.FC = () => {
           </div>
 
           <StatusIndicator status={status} />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            className="text-white hover:bg-white/20"
+            title={`Cambiar a modo ${theme === 'light' ? 'oscuro' : 'claro'}`}
+          >
+            {theme === 'light' ? (
+              <Moon className="w-5 h-5" />
+            ) : (
+              <Sun className="w-5 h-5" />
+            )}
+          </Button>
         </div>
       </div>
 
