@@ -13,14 +13,13 @@ import { CharacterSidebar } from "@/components/ui/features/chat-interface/Charac
 import { StatusIndicator } from "@/components/ui/features/chat-interface/StatusIndicator";
 import { ChatInput } from "@/components/ui/features/chat-interface/ChatInput";
 import { ChatMessages } from "@/components/ui/features/chat-interface/ChatMessages";
-import { VoiceRecordingButton } from "@/components/ui/features/chat-interface/VoiceRecordingButton";
 import { Button } from "@/components/ui/button"
 import { Moon, Sun } from 'lucide-react'
 
-const ChatInterface: React.FC = () => {
+const ChatInterface: React.FC<{ preselectedCharacterId?: string }> = ({ preselectedCharacterId }) => {
   const [status, setStatus] = useState("Desconectado")
   const { theme, toggleTheme } = useTheme()
-  const { availableCharacters, selectedCharacterId, handleCharacterChange } = useCharacters()
+  const { availableCharacters, selectedCharacterId, handleCharacterChange } = useCharacters(preselectedCharacterId)
   const { conversationId, messages, setMessages } = useConversationId(selectedCharacterId)
 
   const { sendMessage, sendAudioMessage, isConnected } = useWebSocketChat({
@@ -70,16 +69,16 @@ const ChatInterface: React.FC = () => {
   return (
     <div className="flex w-full min-h-screen">
 
-      <CharacterSidebar
+     {/* <CharacterSidebar
         availableCharacters={availableCharacters}
         selectedCharacterId={selectedCharacterId}
-        onCharacterChange={handleCharacterChange}/>
+        onCharacterChange={handleCharacterChange}/>*/}
 
-<div
-  className="w-full min-h-screen flex flex-col rounded-2xl border border-gray-200 shadow-2xl 
-             bg-white dark:bg-gray-900 dark:border-gray-700 
-             text-gray-900 dark:text-gray-100 transition-all duration-300 overflow-hidden"
->
+      <div
+        className="w-full min-h-screen flex flex-col rounded-2xl border border-gray-200 shadow-2xl 
+                   bg-white dark:bg-gray-900 dark:border-gray-700 
+                   text-gray-900 dark:text-gray-100 transition-all duration-300 overflow-hidden"
+      >
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
@@ -104,12 +103,12 @@ const ChatInterface: React.FC = () => {
         </div>
       </div>
 
-      {/* 💡 Selector de Personaje */}
+      {/* 💡 Selector de Personaje 
       <CharacterSelector
         availableCharacters={availableCharacters}
         selectedCharacterId={selectedCharacterId}
         onCharacterChange={handleCharacterChange}
-      />
+      />*/}
 
       <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50 dark:bg-gray-800/50">
         {/* ... (Mensajes de chat) ... */}
@@ -129,13 +128,10 @@ const ChatInterface: React.FC = () => {
           selectedCharacterId={selectedCharacterId}
           availableCharacters={availableCharacters}
           onSendMessage={handleSendMessage}
-        />
-
-        <VoiceRecordingButton
-          isRecording={isRecording}
-          isConnected={isConnected}
           onToggleRecording={handleToggleRecording}
         />
+
+        {/* VoiceRecordingButton removed — ahora está dentro de ChatInput */}
         <p className="mt-3 text-xs text-center text-gray-500 dark:text-gray-400">
           Transcripción de voz con ElevenLabs • Respuestas con audio incluido
         </p>

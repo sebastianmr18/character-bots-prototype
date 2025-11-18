@@ -1,10 +1,14 @@
-import Image from "next/image";
-import ChatInterface from "@/components/ui/features/chat-interface/module";
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
-  return (
-    <div className="font-sans min-h-screen w-full">
-      <ChatInterface />
-    </div>
-  );
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/home");
+  }, []);
+
+  return null;
 }

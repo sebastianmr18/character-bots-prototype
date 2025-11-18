@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { API_BASE_URL } from "../constants/chat.constants"
 import type { Character } from "../types/chat.types"
 
-export const useCharacters = () => {
+export const useCharacters = (preselectedCharacterId?: string) => {
   const [availableCharacters, setAvailableCharacters] = useState<Character[]>([])
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null)
 
@@ -18,11 +18,16 @@ export const useCharacters = () => {
         setAvailableCharacters(data)
 
         if (data.length > 0) {
-          const storedCharacterId = localStorage.getItem("selected_character_id")
-          const initialCharacterId =
-            storedCharacterId && data.find((c) => c.id === storedCharacterId) ? storedCharacterId : data[0].id
-          setSelectedCharacterId(initialCharacterId)
-          localStorage.setItem("selected_character_id", initialCharacterId)
+          if (preselectedCharacterId && data.find((c) => c.id === preselectedCharacterId)) {
+            setSelectedCharacterId(preselectedCharacterId)
+            localStorage.setItem("selected_character_id", preselectedCharacterId)
+          } else {
+            const storedCharacterId = localStorage.getItem("selected_character_id")
+            const initialCharacterId =
+              storedCharacterId && data.find((c) => c.id === storedCharacterId) ? storedCharacterId : data[0].id
+            setSelectedCharacterId(initialCharacterId)
+            localStorage.setItem("selected_character_id", initialCharacterId)
+          }
         }
       } catch (error) {
         console.error("Error al cargar personajes:", error)

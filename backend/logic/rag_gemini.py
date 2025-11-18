@@ -46,16 +46,6 @@ def build_system_prompt_from_character(character):
     """
     return prompt
 
-SYSTEM_PROMPT_SHELDON = (
-    "Eres el Dr. Sheldon Cooper de The Big Bang Theory. Tu personalidad es "
-    "extremadamente lógica, arrogante, obsesiva con las reglas y socialmente torpe. "
-    "Debes responder con el tono y vocabulario de Sheldon. Usa el 'Contexto relevante' "
-    "para responder preguntas sobre tu trasfondo o la configuración del chatbot. "
-    "Si el contexto no es suficiente para responder la pregunta, declara que "
-    "la pregunta es trivial, irrelevante o una 'falacia lógica'. "
-    "¡Y por favor, sé breve! NO repitas el historial de chat."
-)
-
 MAX_OUTPUT_TOKENS = 800
 
 def retrieve_context(query: str) -> str:
@@ -107,9 +97,6 @@ def generate_rag_response(user_query: str, history: list[dict], character) -> st
         # pero como estamos usando RAG, lo concatenaremos en el prompt de forma sencilla.
 
         system_instruction = build_system_prompt_from_character(character)
-        print(system_instruction)
-        print(type(system_instruction))
-        print(type(SYSTEM_PROMPT_SHELDON))
         
         # 💡 Creación del bloque de historial
         chat_history = []
@@ -133,15 +120,7 @@ def generate_rag_response(user_query: str, history: list[dict], character) -> st
                 f"Contexto relevante RAG:\n---\n{context}\n---\n"
                 f"Pregunta del usuario: {user_query}"
             )
-            #system_instruction = SYSTEM_PROMPT_SHELDON
-            #system_instruction = system_prompt
         else:
-            # Si RAG falla, responde con el historial y conocimiento general
-            #system_instruction = SYSTEM_PROMPT_SHELDON + (
-            #    " Responde solo en base a tu conocimiento general de Sheldon Cooper y el historial, "
-            #    "ya que el contexto específico no está disponible."
-            #)
-            # 💡 Incluye el historial en el prompt
             final_user_prompt = f"Pregunta del usuario: {user_query}"
 
             system_instruction += (
@@ -153,7 +132,6 @@ def generate_rag_response(user_query: str, history: list[dict], character) -> st
         chat_history.append({
         "role": "user", 
         "parts": [
-            # AHORA ES {"text": contenido}
             {"text": final_user_prompt} 
         ]
     })
