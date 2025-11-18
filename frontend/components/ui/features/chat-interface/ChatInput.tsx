@@ -7,6 +7,7 @@ import { Mic, Send, MicOff } from 'lucide-react'
 interface ChatInputProps {
   isRecording: boolean
   isConnected: boolean
+  isModalOpen: boolean
   selectedCharacterId: string | null
   availableCharacters: Array<{ id: string; name: string }>
   onSendMessage: (text: string) => void
@@ -16,6 +17,7 @@ interface ChatInputProps {
 export const ChatInput: React.FC<ChatInputProps> = ({
   isRecording,
   isConnected,
+  isModalOpen,
   selectedCharacterId,
   availableCharacters,
   onSendMessage,
@@ -31,12 +33,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   }
 
+  const inputDisabled = isRecording || !isConnected || isModalOpen;
+
+  const actionDisabled = !isConnected || isModalOpen;
+
   const recordButtonClasses = `px-4 py-3 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg 
                                flex items-center justify-center gap-2 flex-shrink-0
-                               ${isRecording 
-                                 ? "bg-red-600 text-white hover:bg-red-700 active:scale-95" 
-                                 : "bg-orange-500 text-white hover:bg-orange-600 active:scale-95"
-                               } disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-orange-500`
+                               ${isRecording
+      ? "bg-red-600 text-white hover:bg-red-700 active:scale-95"
+      : "bg-orange-500 text-white hover:bg-orange-600 active:scale-95"
+    } disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-orange-500`
 
   const sendButtonClasses = `px-4 py-3 bg-blue-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg
                              flex items-center justify-center gap-2 flex-shrink-0
@@ -67,7 +73,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <button
           type="button"
           onClick={onToggleRecording}
-          disabled={!isConnected}
+          disabled={actionDisabled || isRecording}
           className={recordButtonClasses}
           aria-label={isRecording ? "Detener grabación" : "Iniciar grabación"}
           title={isRecording ? "Detener grabación" : "Iniciar grabación"}

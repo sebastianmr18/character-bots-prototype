@@ -8,10 +8,19 @@ export interface Character {
   id: string
   name: string
   description: string
+  role: string
+  biography: string
+}
+
+export interface Conversation {
+  id: string
+  created_at: string
+  character: Character
+  messages: Message[]
 }
 
 export interface WebSocketMessage {
-  type: "init" | "status" | "transcription" | "text_response" | "audio_response" | "error"
+  type: "init" | "status" | "transcription_result" | "text_response" | "audio_response" | "error"
   conversation_id?: string
   character_id?: string
   message?: string

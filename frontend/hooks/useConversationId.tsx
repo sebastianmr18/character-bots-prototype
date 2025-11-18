@@ -1,57 +1,73 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CONVERSATION_ID_PREFIX, API_BASE_URL } from "@/constants/chat.constants"
-import { generateUUID } from "@/utils/uuid.utils"
-import type { Message } from "@/types/chat.types"
+import { API_BASE_URL } from "@/constants/chat.constants"
+import type { Message, Character } from "@/types/chat.types"
 
-export const useConversationId = (selectedCharacterId: string | null) => {
-  const [conversationId, setConversationId] = useState<string | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
+interface CharacterReference {
+    id: string;
+    name: string;
+}
 
-  useEffect(() => {
-    if (!selectedCharacterId) return
+export const useConversation = (initialConversationId: string) => {
+    const conversationId = initialConversationId
+    
+    // Estados para la data cargada
+    const [messages, setMessages] = useState<Message[]>([])
+    const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null)
+    const [isLoading, setIsLoading] = useState(true)
 
-    const STORAGE_KEY = CONVERSATION_ID_PREFIX + selectedCharacterId
-    let id = localStorage.getItem(STORAGE_KEY)
+    const availableCharacters: CharacterReference[] = selectedCharacter 
+        ? [{ id: selectedCharacter.id, name: selectedCharacter.name }] 
+        : []
 
-    if (!id) {
-      id = generateUUID()
-      localStorage.setItem(STORAGE_KEY, id)
-      console.log(`Nuevo ID (${id}) generado para personaje: ${selectedCharacterId}`)
-    } else {
-      console.log(`ID (${id}) recuperado para personaje: ${selectedCharacterId}`)
-    }
-
-    setConversationId(id)
-    setMessages([])
-
-    const fetchMessages = async (currentId: string) => {
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/conversations/${currentId}/messages/?character_id=${selectedCharacterId}`,
-        )
-
-        if (!response.ok && response.status !== 404) {
-          throw new Error(`Error HTTP ${response.status}`)
+    useEffect(() => {
+        if (!conversationId) {
+            setIsLoading(false);
+            return
         }
 
-        if (response.status === 404) {
-          console.log("No hay historial, comenzando nuevo chat.")
-          return
+        setIsLoading(true)
+
+        const fetchConversationData = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/`)
+
+                if (!response.ok) {
+                    throw new Error(`Error HTTP ${response.status} al cargar conversación`)
+                }
+
+                const data: { 
+                    id: string, 
+                    character: Character, 
+                    messages: Message[] 
+                } = await response.json()
+                
+                console.log("Conversación cargada:", data)
+                
+                setSelectedCharacter(data.character)
+                setMessages(data.messages || [])
+
+            } catch (error) {
+                console.error("Error al cargar la conversación:", error)
+                setSelectedCharacter(null)
+                setMessages([])
+            } finally {
+                setIsLoading(false)
+            }
         }
 
-        const data = await response.json()
-        console.log("Mensajes previos cargados:", data)
-        if (Array.isArray(data)) setMessages(data)
-      } catch (error) {
-        console.error("Error al cargar mensajes previos:", error)
-        setMessages([])
-      }
+        fetchConversationData()
+
+    }, [conversationId])
+
+    return { 
+        conversationId, 
+        messages, 
+        setMessages, 
+        selectedCharacterId: selectedCharacter?.id || null,
+        characterName: selectedCharacter?.name || "Cargando...",
+        availableCharacters,
+        isLoading
     }
-
-    fetchMessages(id)
-  }, [selectedCharacterId])
-
-  return { conversationId, messages, setMessages }
 }

@@ -5,34 +5,43 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { CharacterCard } from '@/components/ui/features/chat-interface/CharacterCard'
 import { API_BASE_URL } from '@/constants/chat.constants'
-import type { Character } from '@/types/chat.types'
-import { ArrowLeft, Sparkles } from 'lucide-react'
+import type { Character, Conversation } from '@/types/chat.types'
+import { ArrowLeft, Sparkles, MessageSquare } from 'lucide-react'
+
+interface Message {
+  role: string
+  content: string
+  timestamp: string
+}
 
 export default function ChatsPage() {
   const router = useRouter()
-  const [characters, setCharacters] = useState<Character[]>([])
+  const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchCharacters = async () => {
+    const fetchConversations = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/characters/`)
+        const response = await fetch(`${API_BASE_URL}/conversations/`)
         if (!response.ok) throw new Error(`Error HTTP ${response.status}`)
 
-        const data: Character[] = await response.json()
-        setCharacters(data)
+        const data: Conversation[] = await response.json()
+        const sortedData = data.sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )
+        setConversations(sortedData)
       } catch (error) {
-        console.error('Error al cargar personajes:', error)
+        console.error('Error al cargar conversaciones:', error)
       } finally {
         setLoading(false)
       }
     }
 
-    fetchCharacters()
+    fetchConversations()
   }, [])
 
-  const handleCharacterSelect = (characterId: string) => {
-    router.push(`/chats/${characterId}`)
+  const handleConversationSelect = (conversationId: string) => {
+    router.push(`/chats/${conversationId}`)
   }
 
   return (
@@ -53,37 +62,38 @@ export default function ChatsPage() {
               <div className="flex items-center gap-2">
                 <Sparkles className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  Personajes Disponibles
+                  Mis Conversaciones
                 </h1>
               </div>
             </div>
           </div>
           <p className="text-gray-600 dark:text-gray-400 ml-12">
-            Selecciona un personaje para comenzar a conversar
+            Historial de charlas con tus personajes de IA
           </p>
         </div>
       </div>
 
-      {/* Characters Grid */}
+      {/* Conversations Grid */}
       <div className="max-w-7xl mx-auto px-4 py-12">
         {loading ? (
           <div className="flex items-center justify-center min-h-96">
-            <p className="text-gray-600 dark:text-gray-400">Cargando personajes...</p>
+            <p className="text-gray-600 dark:text-gray-400 animate-pulse">Cargando historial...</p>
           </div>
-        ) : characters.length > 0 ? (
+        ) : conversations.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {characters.map((character) => (
+            {conversations.map((conversation) => (
               <CharacterCard
-                key={character.id}
-                character={character}
-                onClick={() => handleCharacterSelect(character.id)}
+                key={conversation.id}
+                conversation={conversation}
+                onClick={() => handleConversationSelect(conversation.id)}
               />
             ))}
           </div>
         ) : (
-          <div className="text-center py-12">
-            <p className="text-gray-600 dark:text-gray-400 mb-4">No hay personajes disponibles</p>
-            <Button onClick={() => router.push('/')}>Volver a inicio</Button>
+          <div className="text-center py-12 flex flex-col items-center">
+            <MessageSquare className="w-16 h-16 text-gray-300 mb-4" />
+            <p className="text-gray-600 dark:text-gray-400 mb-4 text-lg">No tienes conversaciones activas.</p>
+            <Button onClick={() => router.push('/')}>Iniciar nueva charla</Button>
           </div>
         )}
       </div>

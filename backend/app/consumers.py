@@ -132,13 +132,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
     # 3. RECEPCIÓN DE MENSAJE DEL CLIENTE
     async def receive(self, text_data):
         """Llamado cuando se recibe un mensaje del cliente."""
-        print(f"handle_text_message recibido: {text_data}")
+        print(f"Mensaje WS recibido: {text_data[:100]}...")
         text_data_json = json.loads(text_data)
         message_type = text_data_json.get('type')
         
         # 💡 Aseguramos que el conversation_id siempre esté presente
         conversation_id = text_data_json.get('conversation_id')
-        character_id = text_data_json.get('character_id')  # Actualmente no usado
+        character_id = text_data_json.get('character_id')
 
         if not conversation_id:
             await self.send(text_data=json.dumps({
@@ -149,13 +149,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # Guardamos el ID en el consumer para uso posterior
         self.conversation_id = conversation_id
-        self.character_id = character_id  # Actualmente no usado
+        self.character_id = character_id 
 
         if message_type == 'audio' and 'audio' in text_data_json:
-            # Manejar audio del frontend
-            await self.handle_audio_message(text_data_json)
+            # --- NUEVO FLUJO (REGLA 1) ---
+            # Manejar audio (SOLO TRANSCRIPCIÓN)
+            await self.handle_transcribe_request(text_data_json)
         elif message_type == 'text' and 'text' in text_data_json:
-            # Manejar texto del frontend (comportamiento original)
+            # --- FLUJO ÚNICO DE CHAT (REGLA 2) ---
+            # Manejar texto (RAG/LLM/TTS y Guardado)
             await self.handle_text_message(text_data_json)
         elif message_type == 'init':
             # Mensaje de inicialización, no hacer nada especial por ahora
@@ -166,6 +168,40 @@ class ChatConsumer(AsyncWebsocketConsumer):
         else:
             # Tipo de mensaje desconocido o datos faltantes
             print(f"Mensaje WS ignorado: Tipo '{message_type}' o faltan datos.")
+
+    # 5. NUEVO MANEJADOR DE AUDIO (SOLO TRANSCRIPCIÓN - REGLA 1)
+    async def handle_transcribe_request(self, text_data_json):
+        """
+        Maneja mensajes de audio.
+        Solo transcribe y devuelve el texto. No llama al LLM ni guarda.
+        """
+        print("handle_transcribe_request (STT Only) recibido...")
+        audio_base64 = text_data_json['audio']
+        
+        await self.send(text_data=json.dumps({
+            'type': 'status',
+            'message': 'Transcribiendo audio...'
+        }))
+        
+        try:
+            # 1. Transcribir audio a texto
+            transcribed_text = await sync_to_async(
+                transcribe_audio_from_base64,
+                thread_sensitive=True
+            )(audio_base64)
+            
+            # 2. Enviar transcripción al cliente (FIN DEL FLUJO)
+            await self.send(text_data=json.dumps({
+                'type': 'transcription_result', # Tipo de mensaje solicitado
+                'text': transcribed_text
+            }))
+            
+        except Exception as e:
+            print(f"Error procesando audio (transcribe_only): {e}")
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': f'Error al transcribir el audio: {str(e)}'
+            }))
     
     async def handle_text_message(self, text_data_json):
         """Maneja mensajes de texto del frontend."""

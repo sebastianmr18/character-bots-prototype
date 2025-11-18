@@ -10,6 +10,7 @@ interface UseWebSocketChatProps {
   selectedCharacterId: string | null
   onStatusChange: (status: string) => void
   onMessagesUpdate: (messages: Message[]) => void
+  onTranscriptionResult: (text: string) => void
 }
 
 export const useWebSocketChat = ({
@@ -17,6 +18,7 @@ export const useWebSocketChat = ({
   selectedCharacterId,
   onStatusChange,
   onMessagesUpdate,
+  onTranscriptionResult,
 }: UseWebSocketChatProps) => {
   const ws = useRef<WebSocket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
@@ -47,13 +49,18 @@ export const useWebSocketChat = ({
           onStatusChange(data.message || "")
           break
 
-        case "transcription":
-          onMessagesUpdate((prev) => [...prev, { id: Date.now(), role: "user", content: data.text || "" }])
-          console.log("Transcripción recibida")
+        case "transcription_result":
+          if (data.text) {
+            onTranscriptionResult(data.text)
+          }
+          console.log("Resultado de transcripción recibido")
           break
 
         case "text_response":
-          onMessagesUpdate((prev) => [...prev, { id: Date.now(), role: "assistant", content: data.text || "" }])
+          onMessagesUpdate((prev) => [
+            ...prev,
+            { id: Date.now(), role: "assistant", content: data.text || "" },
+          ])
           onStatusChange("Listo")
           console.log("Respuesta de Gemini Escrita")
           break
@@ -69,7 +76,8 @@ export const useWebSocketChat = ({
           onStatusChange(`Error: ${data.message || ""}`)
           if (data.message?.includes("ID de conversación inválido")) {
             console.error("ID inválido detectado, forzando regeneración.")
-            const DYNAMIC_CONV_KEY = CONVERSATION_ID_PREFIX + selectedCharacterId
+            const DYNAMIC_CONV_KEY =
+              CONVERSATION_ID_PREFIX + selectedCharacterId
             localStorage.removeItem(DYNAMIC_CONV_KEY)
             ws.current?.close()
           }
@@ -80,7 +88,7 @@ export const useWebSocketChat = ({
     ws.current.onclose = () => {
       onStatusChange("Desconectado")
       setIsConnected(false)
-      console.log("WebSocket cerrado. Reconectando en 5s...")
+      console.log("WebSocket cerrado.")
     }
 
     ws.current.onerror = (error) => {
@@ -92,11 +100,22 @@ export const useWebSocketChat = ({
     return () => {
       ws.current?.close()
     }
-  }, [conversationId, selectedCharacterId, onStatusChange, onMessagesUpdate])
+  }, [
+    conversationId,
+    selectedCharacterId,
+    onStatusChange,
+    onMessagesUpdate,
+    onTranscriptionResult,
+  ])
 
   const sendMessage = useCallback(
     (text: string) => {
-      if (!text.trim() || ws.current?.readyState !== WebSocket.OPEN || !conversationId || !selectedCharacterId) {
+      if (
+        !text.trim() ||
+        ws.current?.readyState !== WebSocket.OPEN ||
+        !conversationId ||
+        !selectedCharacterId
+      ) {
         return
       }
 
@@ -114,14 +133,20 @@ export const useWebSocketChat = ({
 
   const sendAudioMessage = useCallback(
     (base64Data: string) => {
-      if (ws.current?.readyState !== WebSocket.OPEN || !conversationId || !selectedCharacterId) {
-        console.error("No se pudo enviar el audio: conexión no disponible o IDs nulos.")
+      if (
+        ws.current?.readyState !== WebSocket.OPEN ||
+        !conversationId ||
+        !selectedCharacterId
+      ) {
+        console.error(
+          "No se pudo enviar el audio: conexión no disponible o IDs nulos.",
+        )
         return
       }
 
       ws.current.send(
         JSON.stringify({
-          type: "audio",
+          type: "audio", // Este tipo ahora solo transcribe
           audio: base64Data,
           conversation_id: conversationId,
           character_id: selectedCharacterId,
