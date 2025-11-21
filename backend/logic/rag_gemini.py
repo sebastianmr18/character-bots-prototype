@@ -8,6 +8,7 @@ from django.shortcuts import get_object_or_404
 # Configuración
 MODEL_NAME = "gemini-2.5-flash"
 #CHROMA_PATH = "./chroma_db"
+#TODO: Hacer que segun el chat se cambie dinamicamente la base de conocimiento
 COLLECTION_NAME = "sheldon-dataset-rag"
 
 EMBEDDING_FUNCTION = embedding_functions.SentenceTransformerEmbeddingFunction(
@@ -71,7 +72,7 @@ def retrieve_context(query: str) -> str:
         # Realiza la búsqueda de similitud (Top 3 resultados)
         results = collection.query(
             query_texts=[query],
-            n_results=3,
+            n_results=2,
             include=['documents']
         )
         
@@ -145,6 +146,7 @@ def generate_rag_response(user_query: str, history: list[dict], character) -> st
                 max_output_tokens=MAX_OUTPUT_TOKENS,
             )
         )
+        print(response)
         
         return response.text
         

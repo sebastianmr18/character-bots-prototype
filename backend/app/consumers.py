@@ -12,7 +12,7 @@ from logic.stt_elevenlabs import transcribe_audio_from_base64
 
 from app.models import Conversation, Message, Character
 
-MAX_HISTORY_MESSAGES = 10 # Los últimos 10 mensajes (5 turnos completos)
+MAX_HISTORY_MESSAGES = 6 # Los últimos 6 mensajes (3 turnos completos)
 
 @sync_to_async
 def get_or_create_conversation_and_history(conversation_id_str, character_id_str):

@@ -1,5 +1,8 @@
 "use client"
-
+/**
+ * 
+ * unused
+ */
 import type React from "react"
 import type { Character } from "@/types/chat.types"
 

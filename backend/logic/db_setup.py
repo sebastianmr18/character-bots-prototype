@@ -60,7 +60,7 @@ def initialize_chroma_db():
     )
 
     # Crea la colección
-    collection_name = "sheldon-dataset-rag"
+    collection_name = "homero-simpson-dataset"
     try:
         client.delete_collection(name=collection_name)
     except:
@@ -79,6 +79,7 @@ def initialize_chroma_db():
         print(f"Buscando PDFs en {PDF_DIR}...")
         
         documents, metadatas, ids = load_documents_from_pdf_dir(PDF_DIR)
+        print(documents, metadatas, ids)
         
         if documents:
             print(f"Cargando {len(documents)} documentos (chunks de PDF) en Chroma...")
