@@ -9,7 +9,7 @@ interface UseWebSocketChatProps {
   conversationId: string | null
   selectedCharacterId: string | null
   onStatusChange: (status: string) => void
-  onMessagesUpdate: (messages: Message[]) => void
+  onMessagesUpdate: (updater: (prev: Message[]) => Message[]) => void
   onTranscriptionResult: (text: string) => void
 }
 

@@ -4,6 +4,11 @@ export interface Message {
   content: string
 }
 
+export interface CharacterReference {
+    id: string;
+    name: string;
+}
+
 export interface Character {
   id: string
   name: string

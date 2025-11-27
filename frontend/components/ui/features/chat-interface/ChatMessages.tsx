@@ -1,12 +1,12 @@
 import type React from "react"
-import type { Message, Character } from "@/types/chat.types"
+import type { Message, CharacterReference } from "@/types/chat.types"
 
 interface ChatMessagesProps {
   messages: Message[]
-  availableCharacters: Character[]
+  availableCharacters: CharacterReference[]
   selectedCharacterId: string | null
   conversationId: string | null
-  messagesEndRef: React.RefObject<HTMLDivElement>
+  messagesEndRef: React.RefObject<HTMLDivElement | null>
 }
 
 export const ChatMessages: React.FC<ChatMessagesProps> = ({
