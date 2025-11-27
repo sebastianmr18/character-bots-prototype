@@ -21,6 +21,13 @@ class Character(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    vector_db_name = models.CharField(
+        max_length=150,
+        unique=False, 
+        blank=True,
+        help_text="Nombre de la base de datos vectorial para RAG"
+    )
+
     class Meta:
         verbose_name = "Personaje"
         verbose_name_plural = "Personajes"
@@ -29,6 +36,7 @@ class Character(models.Model):
 
     def __str__(self):
         return self.name
+
 
 # Create your models here.
 class Conversation(models.Model):
@@ -51,9 +59,9 @@ class Conversation(models.Model):
     # Si un personaje se borra, la conversación no (SET_NULL).
     character = models.ForeignKey(
         Character,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True, # Permitir nulo por ahora
+        on_delete=models.CASCADE,
+        null=False,
+        blank=False,
         related_name='conversations'
     )
     

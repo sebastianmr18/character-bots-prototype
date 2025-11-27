@@ -3,6 +3,8 @@
  * 
  * unused
  */
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type React from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -65,7 +67,7 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({ conversation, onCl
 
         <div className="flex-1 mt-2">
           <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-3 italic bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-100 dark:border-gray-800">
-             "{character.biography}"
+             `&quot;`{character.biography}`&quot;`
           </p>
         </div>
 
