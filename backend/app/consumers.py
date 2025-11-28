@@ -1,18 +1,20 @@
 import json
-from channels.generic.websocket import AsyncWebsocketConsumer
-import base64 # 💡 Necesario para codificar/decodificar el audio
-from asgiref.sync import sync_to_async
-from django.db.models import ObjectDoesNotExist
-from django.core.exceptions import ValidationError
+import base64
 import uuid
+from channels.generic.websocket import AsyncWebsocketConsumer
+from asgiref.sync import sync_to_async # Importación correcta
 
+# Importaciones de tu lógica de negocio (asumimos que son síncronas)
 from logic.rag_gemini import generate_rag_response
 from logic.tts_elevenlabs import generate_audio_from_text
 from logic.stt_elevenlabs import transcribe_audio_from_base64 
 
+# Importaciones de Django/Modelos
+from django.db.models import ObjectDoesNotExist
+from django.core.exceptions import ValidationError
 from app.models import Conversation, Message, Character
 
-MAX_HISTORY_MESSAGES = 6 # Los últimos 6 mensajes (3 turnos completos)
+MAX_HISTORY_MESSAGES = 6
 
 @sync_to_async
 def get_or_create_conversation_and_history(conversation_id_str, character_id_str):
@@ -82,7 +84,7 @@ def get_or_create_conversation_and_history(conversation_id_str, character_id_str
         for m in reversed(history_qs) # Se invierte para que el más antiguo vaya primero
     ]
     
-    return conversation, history, character
+    return conversation, history, conversation.character
 
 @sync_to_async
 def save_messages(conversation, user_text, llm_response_text):
@@ -102,6 +104,40 @@ def save_messages(conversation, user_text, llm_response_text):
         content=llm_response_text
     )
     # No devuelve nada, solo realiza la acción
+
+
+# FUNCIÓN DE LÓGICA DE NEGOCIO (SINCRONA)
+def get_rag_gemini_tts_response(user_text, history, character):
+    """
+    Función síncrona que coordina RAG, Gemini y TTS, usando historial.
+    """
+    
+    # --- 1. RAG y Generación con Gemini ---
+    try:
+        gemini_response_text = generate_rag_response(user_text, history, character)
+    except Exception as e:
+        print(f"Error en RAG/Gemini: {e}")
+        gemini_response_text = "Disculpa, hubo un problema al procesar tu solicitud con el modelo de IA."
+
+    
+    # --- 2. Conversión de Texto a Voz (TTS) con ElevenLabs ---
+    audio_data_base64 = None
+    if gemini_response_text and gemini_response_text.strip():
+        try:
+            raw_audio_data = generate_audio_from_text(gemini_response_text) 
+            audio_data_base64 = base64.b64encode(raw_audio_data).decode('utf-8')
+        except (ValueError) as e:
+            print(f"Error en la generación de audio (ElevenLabs): {e}")
+            audio_data_base64 = None 
+        except Exception as e:
+            print(f"Error inesperado durante TTS: {e}")
+            audio_data_base64 = None
+    else:
+        print("AVISO: El LLM devolvió un texto vacío. Se omitió la llamada a ElevenLabs (422 evitado).")
+        gemini_response_text = "El modelo de IA no pudo generar una respuesta clara."
+
+
+    return gemini_response_text, audio_data_base64
 
 class ChatConsumer(AsyncWebsocketConsumer):
     # 1. CONEXIÓN
@@ -220,7 +256,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
             # 💡 2. Obtener Respuesta con RAG/Gemini/TTS, pasando el historial
             gemini_response_text, audio_data_base64 = await sync_to_async(
-                self.get_rag_gemini_tts_response, 
+                get_rag_gemini_tts_response, 
                 thread_sensitive=True
             )(user_text, history, character) # 💡 Se pasa el historial
 
@@ -250,26 +286,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'type': 'error',
                 'message': f'Error interno del servidor: {e}'
             }))
-                
-        '''gemini_response_text, audio_data_base64 = await sync_to_async(
-            self.get_rag_gemini_tts_response, 
-            thread_sensitive=True
-        )(user_text)
-
-        # 4. ENVÍO DE RESPUESTA AL CLIENTE
-        # Envía la respuesta de texto
-        await self.send(text_data=json.dumps({
-            'type': 'text_response',
-            'text': gemini_response_text
-        }))
-
-        # Envía el audio (como Base64)
-        if audio_data_base64:
-             await self.send(text_data=json.dumps({
-                'type': 'audio_response',
-                'audio': audio_data_base64
-            }))'''
-    
+                    
     async def handle_audio_message(self, text_data_json):
         """Maneja mensajes de audio del frontend."""
         audio_base64 = text_data_json['audio']
@@ -304,7 +321,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             
             # 💡 2. Procesar la transcripción con RAG + Gemini + TTS, pasando el historial
             gemini_response_text, audio_data_base64 = await sync_to_async(
-                self.get_rag_gemini_tts_response, 
+                get_rag_gemini_tts_response, 
                 thread_sensitive=True
             )(transcribed_text, history, character) # 💡 Se pasa el historial
 
@@ -354,36 +371,3 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'type': 'error',
                 'message': f'Error al procesar el audio: {str(e)}'
             }))
-
-    # FUNCIÓN DE LÓGICA DE NEGOCIO (SINCRONA)
-    def get_rag_gemini_tts_response(self, user_text, history, character):
-        """
-        Función síncrona que coordina RAG, Gemini y TTS, usando historial.
-        """
-        
-        # --- 1. RAG y Generación con Gemini ---
-        try:
-            gemini_response_text = generate_rag_response(user_text, history, character)
-        except Exception as e:
-            print(f"Error en RAG/Gemini: {e}")
-            gemini_response_text = "Disculpa, hubo un problema al procesar tu solicitud con el modelo de IA."
-
-        
-        # --- 2. Conversión de Texto a Voz (TTS) con ElevenLabs ---
-        audio_data_base64 = None
-        if gemini_response_text and gemini_response_text.strip():
-            try:
-                raw_audio_data = generate_audio_from_text(gemini_response_text) 
-                audio_data_base64 = base64.b64encode(raw_audio_data).decode('utf-8')
-            except (ValueError) as e:
-                print(f"Error en la generación de audio (ElevenLabs): {e}")
-                audio_data_base64 = None 
-            except Exception as e:
-                print(f"Error inesperado durante TTS: {e}")
-                audio_data_base64 = None
-        else:
-            print("AVISO: El LLM devolvió un texto vacío. Se omitió la llamada a ElevenLabs (422 evitado).")
-            gemini_response_text = "El modelo de IA no pudo generar una respuesta clara."
-
-
-        return gemini_response_text, audio_data_base64

@@ -3,6 +3,7 @@ import base64
 from elevenlabs.client import ElevenLabs
 import requests
 import io
+from decouple import config
 
 client = None
 
@@ -10,7 +11,7 @@ def get_elevenlabs_client():
     """Inicializa y retorna el cliente ElevenLabs si aún no está inicializado."""
     global client
     if client is None:
-        api_key = os.getenv("ELEVENLABS_API_KEY")
+        api_key = config("ELEVENLABS_API_KEY")
         if not api_key:
             raise ValueError("La variable de entorno ELEVENLABS_API_KEY no está configurada.")
         
@@ -33,7 +34,7 @@ def transcribe_audio_from_base64(audio_base64: str) -> str:
         audio_data = base64.b64decode(audio_base64)
         
         # Obtener API key de ElevenLabs
-        api_key = os.getenv("ELEVENLABS_API_KEY")
+        api_key = config("ELEVENLABS_API_KEY")
         if not api_key:
             raise ValueError("La variable de entorno ELEVENLABS_API_KEY no está configurada.")
         
@@ -83,7 +84,7 @@ def transcribe_audio_from_bytes(audio_bytes: bytes) -> str:
     """
     try:
         # Obtener API key de ElevenLabs
-        api_key = os.getenv("ELEVENLABS_API_KEY")
+        api_key = config("ELEVENLABS_API_KEY")
         if not api_key:
             raise ValueError("La variable de entorno ELEVENLABS_API_KEY no está configurada.")
         

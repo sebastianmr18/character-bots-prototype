@@ -2,6 +2,7 @@ import chromadb
 import pypdf
 import os
 from core.utils import get_embedding_function
+from decouple import config
 
 def load_documents_from_pdf_dir(dir_path: str) -> tuple[list, list, list]:
     """
@@ -48,9 +49,9 @@ def initialize_chroma_db():
     #client = chromadb.PersistentClient(path="./chroma_db")
 
     client = chromadb.CloudClient(
-        api_key=os.getenv("CHROMA_API_KEY"),
-        tenant=os.getenv("CHROMA_TENANT"),
-        database=os.getenv("CHROMA_DATABASE")
+        api_key=config("CHROMA_API_KEY"),
+        tenant=config("CHROMA_TENANT"),
+        database=config("CHROMA_DATABASE")
     )
     
     # Crea la colección

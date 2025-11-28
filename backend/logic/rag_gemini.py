@@ -4,6 +4,7 @@ from google import genai
 from google.genai.errors import APIError
 from django.shortcuts import get_object_or_404
 from core.utils import get_embedding_function
+from decouple import config
 
 # Configuración
 MODEL_NAME = "gemini-2.5-flash"
@@ -48,16 +49,10 @@ MAX_OUTPUT_TOKENS = 800
 def retrieve_context(query: str) -> str:
     """Busca en ChromaDB el contexto más relevante para la consulta."""
     try:
-        '''client = chromadb.PersistentClient(path=CHROMA_PATH)
-        collection = client.get_collection(
-            name=COLLECTION_NAME,
-            embedding_function=EMBEDDING_FUNCTION
-        )'''
-
         client = chromadb.CloudClient(
-            api_key=os.getenv("CHROMA_API_KEY"),
-            tenant=os.getenv("CHROMA_TENANT"),
-            database=os.getenv("CHROMA_DATABASE")
+            api_key=config("CHROMA_API_KEY"),
+            tenant=config("CHROMA_TENANT"),
+            database=config("CHROMA_DATABASE")
         )
 
         collection = client.get_collection(
@@ -83,8 +78,11 @@ def retrieve_context(query: str) -> str:
 def generate_rag_response(user_query: str, history: list[dict], character) -> str:
     """Combina RAG con Gemini 2.5 Flash para generar una respuesta."""
     try:
+        gemini_api_key = config("GEMINI_API_KEY")
+        if not gemini_api_key:
+            raise ValueError("GEMINI_API_KEY no configurada.")
         # Inicializa el cliente de Gemini
-        client = genai.Client()
+        client = genai.Client(api_key=gemini_api_key)
         
         # 1. Obtiene el contexto de RAG
         context = retrieve_context(user_query)

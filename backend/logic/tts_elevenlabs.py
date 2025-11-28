@@ -1,6 +1,7 @@
 import os
 from elevenlabs.client import ElevenLabs
 from elevenlabs.play import play
+from decouple import config
 
 client = None
 
@@ -8,7 +9,7 @@ def get_elevenlabs_client():
     """Inicializa y retorna el cliente ElevenLabs si aún no está inicializado."""
     global client
     if client is None:
-        api_key = os.getenv("ELEVENLABS_API_KEY")
+        api_key = config("ELEVENLABS_API_KEY")
         if not api_key:
             raise ValueError("La variable de entorno ELEVENLABS_API_KEY no está configurada.")
         
