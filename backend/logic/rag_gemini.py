@@ -2,18 +2,14 @@ import os
 import chromadb
 from google import genai
 from google.genai.errors import APIError
-from chromadb.utils import embedding_functions
 from django.shortcuts import get_object_or_404
+from core.utils import get_embedding_function
 
 # Configuración
 MODEL_NAME = "gemini-2.5-flash"
 #CHROMA_PATH = "./chroma_db"
 #TODO: Hacer que segun el chat se cambie dinamicamente la base de conocimiento
 COLLECTION_NAME = "sheldon-dataset-rag"
-
-EMBEDDING_FUNCTION = embedding_functions.SentenceTransformerEmbeddingFunction(
-    model_name="all-MiniLM-L6-v2"
-)
 
 # TODO: funcion prompt system
 
@@ -66,7 +62,7 @@ def retrieve_context(query: str) -> str:
 
         collection = client.get_collection(
             name=COLLECTION_NAME,
-            embedding_function=EMBEDDING_FUNCTION
+            embedding_function=get_embedding_function()
         )
         
         # Realiza la búsqueda de similitud (Top 3 resultados)

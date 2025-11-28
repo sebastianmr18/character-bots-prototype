@@ -1,7 +1,7 @@
 import chromadb
-from chromadb.utils import embedding_functions
 import pypdf
 import os
+from core.utils import get_embedding_function
 
 def load_documents_from_pdf_dir(dir_path: str) -> tuple[list, list, list]:
     """
@@ -53,12 +53,6 @@ def initialize_chroma_db():
         database=os.getenv("CHROMA_DATABASE")
     )
     
-    # Embedding de all-MiniLM-L6-v2 para los embeddings de Chroma
-    # para que Chroma pueda manejar la parte de vectorización.
-    embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="all-MiniLM-L6-v2"
-    )
-
     # Crea la colección
     collection_name = "homero-simpson-dataset"
     try:
@@ -68,7 +62,7 @@ def initialize_chroma_db():
     
     collection = client.get_or_create_collection(
         name=collection_name, 
-        embedding_function=embedding_function
+        embedding_function=get_embedding_function()
     )
 
     # Directorio donde se guardan los archivos PDF
