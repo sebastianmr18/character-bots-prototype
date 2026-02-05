@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { WS_URL, CONVERSATION_ID_PREFIX } from "@/constants/chat.constants"
-import type { Message, WebSocketMessage } from "@/types/chat.types"
+import { io, Socket } from "socket.io-client"
+import { WS_URL, API_BASE_URL } from "@/constants/chat.constants"
+import type { Message } from "@/types/chat.types"
 import { playAudio } from "@/utils/audio.utils"
 
 interface UseWebSocketChatProps {
@@ -20,140 +21,206 @@ export const useWebSocketChat = ({
   onMessagesUpdate,
   onTranscriptionResult,
 }: UseWebSocketChatProps) => {
-  const ws = useRef<WebSocket | null>(null)
+  const socketRef = useRef<Socket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const lastMessageCountRef = useRef<number>(0)
 
   useEffect(() => {
     if (!conversationId || !selectedCharacterId) return
 
-    ws.current = new WebSocket(WS_URL)
+    const baseUrl = WS_URL.replace("/ws/chat/", "")
+    
+    socketRef.current = io(baseUrl, {
+      transports: ["websocket"],
+      withCredentials: true,
+    })
+
     onStatusChange("Conectando...")
 
-    ws.current.onopen = () => {
+    const socket = socketRef.current
+
+    socket.on("connect", () => {
       onStatusChange("Conectado")
       setIsConnected(true)
-      ws.current?.send(
-        JSON.stringify({
-          type: "init",
-          conversation_id: conversationId,
-          character_id: selectedCharacterId,
-        }),
-      )
-    }
 
-    ws.current.onmessage = (event) => {
-      const data: WebSocketMessage = JSON.parse(event.data)
+      socket.emit("join_chat", conversationId)
 
-      switch (data.type) {
-        case "status":
-          onStatusChange(data.message || "")
-          break
-
-        case "transcription_result":
-          if (data.text) {
-            onTranscriptionResult(data.text)
+      ;(async () => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/`)
+          if (response.ok) {
+            const data = await response.json()
+            lastMessageCountRef.current = (data.messages || []).length
           }
-          console.log("Resultado de transcripción recibido")
-          break
+        } catch (error) {
+          console.error("Error al inicializar conteo de mensajes:", error)
+        }
+      })()
+    })
 
-        case "text_response":
-          onMessagesUpdate((prev) => [
-            ...prev,
-            { id: Date.now(), role: "assistant", content: data.text || "" },
-          ])
-          onStatusChange("Listo")
-          console.log("Respuesta de Gemini Escrita")
-          break
+    socket.on("system_message", (data: any) => {
+      onStatusChange(data.content || data.message || "Listo")
+    })
 
-        case "audio_response":
-          if (data.audio) {
-            console.log("Audio listo")
-            playAudio(data.audio)
-          }
-          break
+    socket.on("bot_typing", () => {
+      onStatusChange("Escribiendo...")
+    })
 
-        case "error":
-          onStatusChange(`Error: ${data.message || ""}`)
-          if (data.message?.includes("ID de conversación inválido")) {
-            console.error("ID inválido detectado, forzando regeneración.")
-            const DYNAMIC_CONV_KEY =
-              CONVERSATION_ID_PREFIX + selectedCharacterId
-            localStorage.removeItem(DYNAMIC_CONV_KEY)
-            ws.current?.close()
-          }
-          break
+    socket.on("ai_message", (data: { text: string; audio?: string }) => {
+      onMessagesUpdate((prev) => [
+        ...prev,
+        { id: Date.now(), role: "assistant", content: data.text },
+      ])
+      
+      // Detener polling cuando se reciba respuesta del WebSocket
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
       }
-    }
+      
+      if (data.audio) {
+        console.log("Audio recibido")
+        playAudio(data.audio)
+      }
+      onStatusChange("Listo")
+    })
 
-    ws.current.onclose = () => {
+    socket.on("transcription_result", (data: { text: string }) => {
+      if (data.text) {
+        onTranscriptionResult(data.text)
+      }
+    })
+
+    socket.on("error", (data: { message: string }) => {
+      onStatusChange(`Error: ${data.message}`)
+      console.error("Socket Error:", data.message)
+    })
+
+    socket.on("disconnect", () => {
       onStatusChange("Desconectado")
       setIsConnected(false)
-      console.log("WebSocket cerrado.")
-    }
-
-    ws.current.onerror = (error) => {
-      console.error("Error de WebSocket:", error)
-      onStatusChange("Error de conexión")
-      setIsConnected(false)
-    }
+      // Limpiar polling en desconexión
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+    })
 
     return () => {
-      ws.current?.close()
+      // Limpiar polling al desmontar
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+      socket.disconnect()
     }
-  }, [
-    conversationId,
-    selectedCharacterId,
-    onStatusChange,
-    onMessagesUpdate,
-    onTranscriptionResult,
-  ])
+  }, [conversationId, selectedCharacterId, onStatusChange, onMessagesUpdate, onTranscriptionResult])
+
+  // Función para hacer polling de nuevos mensajes desde el backend
+  const pollForNewMessages = useCallback(async () => {
+    if (!conversationId) return
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/`)
+      if (!response.ok) throw new Error("Error al obtener mensajes")
+
+      const data = await response.json()
+      const fetchedMessages: Message[] = data.messages || []
+
+      // Si hay nuevos mensajes
+      if (fetchedMessages.length > lastMessageCountRef.current) {
+        const newMessagesCount = fetchedMessages.length - lastMessageCountRef.current
+        const newMessages = fetchedMessages.slice(
+          lastMessageCountRef.current,
+          fetchedMessages.length
+        )
+
+        // Agregar los nuevos mensajes
+        newMessages.forEach((msg) => {
+          onMessagesUpdate((prev) => {
+            // Evitar duplicados verificando que el mensaje no esté ya en la lista
+            if (!prev.find((m) => m.id === msg.id)) {
+              return [...prev, msg]
+            }
+            return prev
+          })
+        })
+
+        lastMessageCountRef.current = fetchedMessages.length
+
+        // Si hay un mensaje de IA, detener el polling
+        if (newMessages.some((m) => m.role === "assistant")) {
+          onStatusChange("Listo")
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current)
+            pollingIntervalRef.current = null
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error en polling de mensajes:", error)
+    }
+  }, [conversationId, onMessagesUpdate, onStatusChange])
+
+  // Función para iniciar el polling
+  const startPolling = useCallback(() => {
+    // Evitar múltiples polls simultáneos
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current)
+    }
+
+    // Primer polling inmediato
+    pollForNewMessages()
+
+    // Luego polling cada 2 segundos, máximo 30 segundos (15 intentos)
+    let pollCount = 0
+    pollingIntervalRef.current = setInterval(() => {
+      pollCount++
+      pollForNewMessages()
+
+      // Detener después de 30 segundos
+      if (pollCount >= 15) {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current)
+          pollingIntervalRef.current = null
+        }
+      }
+    }, 2000)
+  }, [pollForNewMessages])
 
   const sendMessage = useCallback(
     (text: string) => {
-      if (
-        !text.trim() ||
-        ws.current?.readyState !== WebSocket.OPEN ||
-        !conversationId ||
-        !selectedCharacterId
-      ) {
-        return
-      }
+      if (!text.trim() || !isConnected || !conversationId) return
 
-      ws.current.send(
-        JSON.stringify({
-          type: "text",
-          text,
-          conversation_id: conversationId,
-          character_id: selectedCharacterId,
-        }),
-      )
+      // Enviar evento estructurado según nuestro nuevo Gateway de Node
+      socketRef.current?.emit("send_text", {
+        conversationId,
+        text,
+      })
+
+      // Iniciar polling como fallback si el WebSocket no responde
+      startPolling()
     },
-    [conversationId, selectedCharacterId],
+    [isConnected, conversationId, startPolling]
   )
 
   const sendAudioMessage = useCallback(
     (base64Data: string) => {
-      if (
-        ws.current?.readyState !== WebSocket.OPEN ||
-        !conversationId ||
-        !selectedCharacterId
-      ) {
-        console.error(
-          "No se pudo enviar el audio: conexión no disponible o IDs nulos.",
-        )
+      if (!isConnected || !conversationId) {
+        console.error("No se pudo enviar el audio: sin conexión.")
         return
       }
 
-      ws.current.send(
-        JSON.stringify({
-          type: "audio", // Este tipo ahora solo transcribe
-          audio: base64Data,
-          conversation_id: conversationId,
-          character_id: selectedCharacterId,
-        }),
-      )
+      socketRef.current?.emit("send_audio", {
+        conversationId,
+        audio: base64Data,
+      })
+
+      // Iniciar polling como fallback si el WebSocket no responde
+      startPolling()
     },
-    [conversationId, selectedCharacterId],
+    [isConnected, conversationId, startPolling]
   )
 
   return { sendMessage, sendAudioMessage, isConnected }
