@@ -1,7 +1,6 @@
 "use client";
-
 import React from 'react';
-import { useGeminiLive } from '@/hooks/useGeminiLive';
+import { useBackendLive } from '@/hooks/useBackendLive'; // <- nuevo hook
 import { ChatHistory } from './ChatHistory';
 import { Visualizer } from './Visualizer';
 import { Sidebar } from './Sidebar';
@@ -38,7 +37,7 @@ COMPORTAMIENTOS ESTRUCTURALES:
    - Debes estar preparada para dar indicaciones sobre El Poblado, Provenza y el clima de la "Ciudad de la Eterna Primavera".`;
 
 export const LiveCanvas = () => {
-  const { status, history, isMuted, setIsMuted, connect, disconnect } = useGeminiLive(SOFIA_INSTRUCTION);
+  const { status, history, isMuted, setIsMuted, connect, disconnect } = useBackendLive(SOFIA_INSTRUCTION);
 
 
   return (

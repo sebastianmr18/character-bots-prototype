@@ -76,6 +76,14 @@ export default function Home() {
             Conversa ya!
             <ArrowRight className="w-5 h-5" />
           </Button>
+          <Button
+            size="lg"
+            onClick={() => router.push('/talk-test')}
+            className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white px-8 py-6 text-lg font-semibold rounded-xl flex items-center gap-2 mx-auto"
+          >
+            Conversa ya desde el backend!
+            <ArrowRight className="w-5 h-5" />
+          </Button>
         </div>
       </section>
 
