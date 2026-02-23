@@ -68,10 +68,14 @@ export const useWebSocketChat = ({
     })
 
     socket.on("ai_message", (data: { text: string; audio?: string }) => {
-      onMessagesUpdate((prev) => [
-        ...prev,
-        { id: Date.now(), role: "assistant", content: data.text },
-      ])
+      console.log("[DEBUG] Recibido evento 'ai_message':", data)
+      onMessagesUpdate((prev) => {
+        // Evitar duplicados verificando por content y role
+        if (!prev.find((m) => m.content === data.text && m.role === "assistant")) {
+          return [...prev, { id: -Date.now(), role: "assistant", content: data.text }]
+        }
+        return prev
+      })
       
       // Detener polling cuando se reciba respuesta del WebSocket
       if (pollingIntervalRef.current) {
@@ -87,14 +91,23 @@ export const useWebSocketChat = ({
     })
 
     socket.on("transcription_result", (data: { text: string }) => {
+      console.log("[DEBUG] Recibido evento 'transcription_result':", data)
       if (data.text) {
         onTranscriptionResult(data.text)
+      } else {
+        console.log("[DEBUG] Transcripción vacía o nula")
       }
     })
 
     socket.on("error", (data: { message: string }) => {
+      console.log("[DEBUG] Recibido evento 'error' del socket:", data)
       onStatusChange(`Error: ${data.message}`)
       console.error("Socket Error:", data.message)
+    })
+
+    socket.on("no_speech", (data: { message: string }) => {
+      console.log("[DEBUG] Recibido evento 'no_speech':", data)
+      alert(data.message)
     })
 
     socket.on("disconnect", () => {
@@ -139,8 +152,8 @@ export const useWebSocketChat = ({
         // Agregar los nuevos mensajes
         newMessages.forEach((msg) => {
           onMessagesUpdate((prev) => {
-            // Evitar duplicados verificando que el mensaje no esté ya en la lista
-            if (!prev.find((m) => m.id === msg.id)) {
+            // Evitar duplicados verificando por id, content y role
+            if (!prev.find((m) => m.id === msg.id || (m.content === msg.content && m.role === msg.role))) {
               return [...prev, msg]
             }
             return prev
@@ -191,9 +204,11 @@ export const useWebSocketChat = ({
 
   const sendMessage = useCallback(
     (text: string) => {
+      console.log("[DEBUG] Intentando enviar mensaje de texto:", text, "conectado:", isConnected, "conversationId:", conversationId)
       if (!text.trim() || !isConnected || !conversationId) return
 
       // Enviar evento estructurado según nuestro nuevo Gateway de Node
+      console.log("[DEBUG] Emitiendo 'send_text' con texto:", text)
       socketRef.current?.emit("send_text", {
         conversationId,
         text,
@@ -207,14 +222,16 @@ export const useWebSocketChat = ({
 
   const sendAudioMessage = useCallback(
     (base64Data: string) => {
+      console.log("[DEBUG] Intentando enviar mensaje de audio, conectado:", isConnected, "conversationId:", conversationId)
       if (!isConnected || !conversationId) {
-        console.error("No se pudo enviar el audio: sin conexión.")
+        console.error("[DEBUG] No se pudo enviar el audio: sin conexión o sin conversationId.")
         return
       }
 
+      console.log("[DEBUG] Emitiendo 'send_audio' con audio de longitud:", base64Data.length)
       socketRef.current?.emit("send_audio", {
         conversationId,
-        audio: base64Data,
+        audioBase64: base64Data,
       })
 
       // Iniciar polling como fallback si el WebSocket no responde

@@ -2,7 +2,6 @@
 
 // 1. Imports añadidos
 import type React from "react"
-import { useState, useRef, useEffect, ChangeEvent } from "react"
 import { motion } from "framer-motion"
 import { Mic, X, StopCircle } from "lucide-react"
 
@@ -25,22 +24,24 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
   onSend,
   onToggleRecording,
 }) => {
-  const [editedTranscription, setEditedTranscription] = useState(transcription)
-
-  useEffect(() => {
-    if (isOpen) {
-      setEditedTranscription(transcription)
-    }
-  }, [transcription, isOpen])
-
   if (!isOpen) return null
 
   const hasTranscription = !isRecording && transcription.length > 0;
 
   const handleSendClick = () => {
-    if (editedTranscription.trim()) {
-      onSend(editedTranscription)
+    if (isRecording) {
+      onToggleRecording()
+    } else if (hasTranscription) {
+      onSend(transcription)
+      onClose()
     }
+  }
+
+  const handleCancelClick = () => {
+    if (isRecording) {
+      onToggleRecording()
+    }
+    onClose()
   }
 
   return (
@@ -95,10 +96,8 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
             <div className="absolute inset-0 flex items-center justify-center">
               <button
                 type="button"
-                onClick={isRecording ? onToggleRecording : () => { }}
                 className={`rounded-full p-4 text-white shadow-lg transition-colors ${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-400 dark:bg-gray-700'
                   }`}
-                disabled={hasTranscription}
               >
                 {isRecording ? (
                   <StopCircle className="w-8 h-8" />
@@ -110,47 +109,22 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
           </div>
         </div>
 
-        {hasTranscription && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-6"
-          >
-            <label
-              htmlFor="transcription"
-              className="text-sm text-gray-600 dark:text-gray-400 mb-2 font-semibold block"
-            >
-              Revisa la transcripción:
-            </label>
-            <textarea
-              id="transcription"
-              value={editedTranscription}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
-                setEditedTranscription(e.target.value)
-              }
-              rows={4}
-              className="w-full p-3 bg-gray-100 dark:bg-gray-800 rounded-xl text-gray-900 dark:text-gray-100 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </motion.div>
-        )}
-
         <div className="text-center mb-6">
           <p className="text-gray-600 dark:text-gray-400 text-sm">
             {isRecording
-              ? "Grabando... Presiona para detener."
+              ? "Grabando... Presiona Enviar para detener."
               : hasTranscription
-                ? "Edita el texto y presiona Enviar."
+                ? "Presiona Enviar para continuar."
                 : "Procesando audio..."}
           </p>
         </div>
 
         <div className="flex gap-3">
           <button
-            onClick={onClose}
-            disabled={isRecording || !hasTranscription}
+            onClick={handleCancelClick}
             className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-300 dark:border-gray-600 
                          text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-100 dark:hover:bg-gray-800
-                         transition-all duration-200 disabled:opacity-50"
+                         transition-all duration-200"
           >
             <X className="w-4 h-4 inline mr-2" />
             Cancelar
@@ -158,7 +132,7 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
 
           <button
             onClick={handleSendClick}
-            disabled={!editedTranscription.trim() || !hasTranscription}
+            disabled={!isRecording && !hasTranscription}
             className="flex-1 px-4 py-3 rounded-xl bg-blue-600 text-white font-semibold 
                          hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed
                          transition-all duration-200"
@@ -170,7 +144,7 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
         {/* Mensaje de procesamiento/grabación si no hay transcripción */}
         {!hasTranscription && (
           <p className="mt-4 text-center text-sm text-blue-500 dark:text-blue-400">
-            {isRecording ? "Grabando, presiona el micrófono central para detener." : "Procesando audio en el servidor..."}
+            {isRecording ? "Grabando, presiona Enviar para detener." : "Procesando audio en el servidor..."}
           </p>
         )}
       </motion.div>

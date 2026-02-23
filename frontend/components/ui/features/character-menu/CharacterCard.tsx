@@ -17,7 +17,7 @@ interface CharacterCardProps {
 }
 
 export const CharacterCard: React.FC<CharacterCardProps> = ({ conversation, onClick }) => {
-  const { character, created_at } = conversation
+  const { character, createdAt } = conversation
   
   const initials = character.name
     .split(' ')
@@ -26,13 +26,13 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({ conversation, onCl
     .toUpperCase()
 
   // Formatear fecha
-  const date = new Date(created_at).toLocaleDateString('es-ES', {
+  const date = new Date(createdAt).toLocaleDateString('es-ES', {
     day: 'numeric',
     month: 'short',
     year: 'numeric'
   })
 
-  const time = new Date(created_at).toLocaleTimeString('es-ES', {
+  const time = new Date(createdAt).toLocaleTimeString('es-ES', {
     hour: '2-digit',
     minute: '2-digit'
   })

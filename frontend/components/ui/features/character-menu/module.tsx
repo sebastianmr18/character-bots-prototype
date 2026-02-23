@@ -52,7 +52,7 @@ const groupConversationsByCharacter = (
   characters.forEach(char => {
       // Ordenar los chats descendientemente por fecha de creación
       const sortedChats = grouped[char.id]?.chats.sort((a, b) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       ) || [];
       
       grouped[char.id] = {
@@ -108,7 +108,7 @@ export default function ChatsConversationsPage() {
     router.push(`/chats/${conversationId}`)
   }, [router])
   
-  // 2. Manejador para la creación de un nuevo chat (asumiendo flujo POST)
+  // TODO: Manejador para la creación de un nuevo chat (asumiendo flujo POST)
   const handleNewConversation = useCallback(async (characterId: string) => {
     // 💡 Aquí se realizaría la llamada real al backend
     // para crear una nueva conversación con el characterId

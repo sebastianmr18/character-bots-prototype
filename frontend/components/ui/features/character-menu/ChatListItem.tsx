@@ -4,6 +4,7 @@ import type React from 'react'
 import { useRouter } from 'next/navigation'
 import { MessageSquare, Clock, ArrowRight } from 'lucide-react'
 import type { Conversation } from '@/types/chat.types' // Asume el tipo Conversation
+import { useEffect } from 'react'
 
 interface ChatListItemProps {
   conversation: Conversation
@@ -15,9 +16,12 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({ conversation, onClic
     ? conversation.messages[conversation.messages.length - 1] 
     : null;
 
-  const createdAtDate = new Date(conversation.created_at);
+  const createdAtDate = new Date(conversation.createdAt);
   const dateString = createdAtDate.toLocaleDateString();
   const timeString = createdAtDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    useEffect(() => {
+    console.log(conversation);
+  }, [conversation]);
 
   return (
     <div 

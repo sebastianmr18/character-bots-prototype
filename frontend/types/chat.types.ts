@@ -15,11 +15,12 @@ export interface Character {
   description: string
   role: string
   biography: string
+  voice_id: string
 }
 
 export interface Conversation {
   id: string
-  created_at: string
+  createdAt: string
   character: Character
   messages: Message[]
 }

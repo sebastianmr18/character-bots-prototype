@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { useTheme } from "@/app/providers"
 import { VoiceRecordingModal } from "./VoiceRecordingModal";
 import { useConversation } from "@/hooks/useConversationId";
@@ -11,9 +12,10 @@ import { StatusIndicator } from "@/components/ui/features/chat-interface/StatusI
 import { ChatInput } from "@/components/ui/features/chat-interface/ChatInput";
 import { ChatMessages } from "@/components/ui/features/chat-interface/ChatMessages";
 import { Button } from "@/components/ui/button"
-import { Moon, Sun } from 'lucide-react'
+import { Moon, Sun, Phone } from 'lucide-react'
 
 const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId }) => {
+  const router = useRouter()
   const [status, setStatus] = useState("Desconectado")
   const { theme, toggleTheme } = useTheme()
 
@@ -27,8 +29,14 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
 
   const [showVoiceModal, setShowVoiceModal] = useState(false)
   const [voiceTranscription, setVoiceTranscription] = useState("")
+  const transcriptionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const onTranscriptionResult = useCallback((text: string) => {
+    console.log("[DEBUG] Transcripción recibida del backend:", text)
+    if (transcriptionTimeoutRef.current) {
+      clearTimeout(transcriptionTimeoutRef.current)
+      transcriptionTimeoutRef.current = null
+    }
     setVoiceTranscription(text)
     setShowVoiceModal(true)
     setStatus("Transcripción recibida. Revisa.")
@@ -58,36 +66,68 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
     if (!text.trim()) return
 
     // Add user message immediately
-    setMessages((prev) => [...prev, { id: Date.now(), role: "user", content: text }])
+    setMessages((prev) => [...prev, { id: -Date.now(), role: "user", content: text }])
 
     // Send through WebSocket
     sendMessage(text)
   }
 
   const handleToggleRecording = async () => {
-    if (isRecording) {
-      setStatus("Procesando audio...")
-      const base64Data = await stopRecording()
+    try {
+      if (isRecording) {
+        console.log("[DEBUG] Deteniendo grabación de voz")
+        setStatus("Esperando transcripción...")
+        const base64Data = await stopRecording()
+        console.log("[DEBUG] Grabación detenida, base64Data recibido:", base64Data ? "Sí" : "No", base64Data ? `(${base64Data.length} chars)` : "")
 
-      if (base64Data) {
-        sendAudioMessage(base64Data)
+        if (base64Data) {
+          console.log("[DEBUG] Enviando mensaje de audio al backend")
+          sendAudioMessage(base64Data)
+          // Iniciar timeout para cerrar modal si no llega transcripción
+          transcriptionTimeoutRef.current = setTimeout(() => {
+            console.log("[DEBUG] Timeout: no llegó transcripción, cerrando modal")
+            setShowVoiceModal(false)
+            setVoiceTranscription("")
+            setStatus("Listo")
+          }, 10000) // 10 segundos
+        } else {
+          console.log("[DEBUG] No se recibió base64Data, no se envía mensaje")
+        }
+        // No cerrar el modal aquí, esperar la transcripción
+      } else {
+        console.log("[DEBUG] Iniciando grabación de voz")
+        setVoiceTranscription("") // Limpiar transcripción anterior
+        await startRecording()
+        setStatus("Grabando voz...")
+        console.log("[DEBUG] Grabación iniciada, mostrando modal")
+        setShowVoiceModal(true)
       }
-      setShowVoiceModal(false)
-    } else {
-      await startRecording()
-      setStatus("Grabando voz...")
-      console.log("Grabación iniciada, mostrando modal.?")
-      setShowVoiceModal(true)
+    } catch (error) {
+      console.error("[DEBUG] Error en handleToggleRecording:", error)
+      setStatus("Error en grabación")
     }
   }
 
   const handleSendVoiceMessage = (reviewedText: string) => {
+    console.log("[DEBUG] Enviando mensaje de voz revisado:", reviewedText)
+    if (transcriptionTimeoutRef.current) {
+      clearTimeout(transcriptionTimeoutRef.current)
+      transcriptionTimeoutRef.current = null
+    }
     setShowVoiceModal(false)
     setVoiceTranscription("")
     handleSendMessage(reviewedText)
   }
 
   const handleCloseVoiceModal = () => {
+    if (isRecording) {
+      // Si está grabando, detener primero
+      handleToggleRecording()
+    }
+    if (transcriptionTimeoutRef.current) {
+      clearTimeout(transcriptionTimeoutRef.current)
+      transcriptionTimeoutRef.current = null
+    }
     setShowVoiceModal(false)
     setVoiceTranscription("")
     setStatus("Listo")
@@ -108,20 +148,32 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
               <p className="text-sm text-blue-100">Prototipo con RAG y ElevenLabs</p>
             </div>
 
-            <StatusIndicator status={status} />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              className="text-white hover:bg-white/20"
-              title={`Cambiar a modo ${theme === 'light' ? 'oscuro' : 'claro'}`}
-            >
-              {theme === 'light' ? (
-                <Moon className="w-5 h-5" />
-              ) : (
-                <Sun className="w-5 h-5" />
+            <div className="flex items-center gap-2">
+              {selectedCharacterId && (
+                <Button
+                  onClick={() => router.push(`/call/${selectedCharacterId}`)}
+                  className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-2"
+                  title="Iniciar llamada de voz"
+                >
+                  <Phone className="w-4 h-4" />
+                  <span className="hidden sm:inline">Llamar</span>
+                </Button>
               )}
-            </Button>
+              <StatusIndicator status={status} />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                className="text-white hover:bg-white/20"
+                title={`Cambiar a modo ${theme === 'light' ? 'oscuro' : 'claro'}`}
+              >
+                {theme === 'light' ? (
+                  <Moon className="w-5 h-5" />
+                ) : (
+                  <Sun className="w-5 h-5" />
+                )}
+              </Button>
+            </div>
           </div>
         </div>
 
