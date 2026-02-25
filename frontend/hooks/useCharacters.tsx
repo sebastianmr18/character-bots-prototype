@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { API_BASE_URL } from "../constants/chat.constants"
 import type { Character } from "../types/chat.types"
 
 export const useCharacters = (preselectedCharacterId?: string) => {
@@ -11,7 +10,7 @@ export const useCharacters = (preselectedCharacterId?: string) => {
   useEffect(() => {
     const fetchCharacters = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/characters/`)
+        const response = await fetch('/api/characters')
         if (!response.ok) throw new Error(`Error HTTP ${response.status}`)
 
         const data: Character[] = await response.json()

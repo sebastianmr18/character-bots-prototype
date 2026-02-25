@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,6 +13,16 @@ export default function LoginPage() {
     router.push("/home");
   };
 
+  const handleGoogleLogin = async () => {
+    const supabase = createClient()
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+  }
+
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", padding: 20 }}>
       <div style={{ width: "100%", maxWidth: 520, padding: 32, borderRadius: 12, boxShadow: "0 6px 20px rgba(0,0,0,0.08)", textAlign: "center" }}>
@@ -20,7 +31,7 @@ export default function LoginPage() {
 
         <div style={{ marginTop: 24, display: "grid", gap: 12 }}>
           <button
-            onClick={() => handleSignIn("google")}
+            onClick={handleGoogleLogin}
             style={{
               display: "flex",
               alignItems: "center",

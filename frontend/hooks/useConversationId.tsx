@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { API_BASE_URL } from "@/constants/chat.constants"
 import type { Message, Character } from "@/types/chat.types"
 
 interface CharacterReference {
@@ -31,7 +30,7 @@ export const useConversation = (initialConversationId: string) => {
 
         const fetchConversationData = async () => {
             try {
-                const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/`)
+                const response = await fetch(`/api/conversations/${conversationId}`)
 
                 if (!response.ok) {
                     throw new Error(`Error HTTP ${response.status} al cargar conversación`)

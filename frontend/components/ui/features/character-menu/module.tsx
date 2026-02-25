@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ChatListItem } from '@/components/ui/features/character-menu/ChatListItem'
 import { CreateCharacterModal } from '@/components/ui/features/character-menu/CreateCharacterModal'
-import { API_BASE_URL } from '@/constants/chat.constants'
 import type { Character, Conversation } from '@/types/chat.types'
 import { ArrowLeft, Sparkles, MessageSquare } from 'lucide-react'
 import { generateUUID } from '@/utils/uuid.utils'
@@ -76,8 +75,8 @@ export default function ChatsConversationsPage() {
         
         // Carga paralela de personajes y conversaciones
         const [charResponse, convResponse] = await Promise.all([
-          fetch(`${API_BASE_URL}/characters/`),
-          fetch(`${API_BASE_URL}/conversations/`),
+          fetch('/api/characters'),
+          fetch('/api/conversations'),
         ])
 
         if (!charResponse.ok) throw new Error(`Error HTTP Personajes ${charResponse.status}`)

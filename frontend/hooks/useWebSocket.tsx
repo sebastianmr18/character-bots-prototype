@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import { io, Socket } from "socket.io-client"
-import { WS_URL, API_BASE_URL } from "@/constants/chat.constants"
+import { WS_URL } from "@/constants/chat.constants"
 import type { Message } from "@/types/chat.types"
 import { playAudio } from "@/utils/audio.utils"
 
@@ -48,7 +48,7 @@ export const useWebSocketChat = ({
 
       ;(async () => {
         try {
-          const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/`)
+          const response = await fetch(`/api/conversations/${conversationId}`)
           if (response.ok) {
             const data = await response.json()
             lastMessageCountRef.current = (data.messages || []).length
@@ -135,7 +135,7 @@ export const useWebSocketChat = ({
     if (!conversationId) return
 
     try {
-      const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/`)
+      const response = await fetch(`/api/conversations/${conversationId}`)
       if (!response.ok) throw new Error("Error al obtener mensajes")
 
       const data = await response.json()

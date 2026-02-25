@@ -1,11 +1,63 @@
 'use client'
 
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ArrowRight, Sparkles, MessageCircle, Zap } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+
+type HeaderUser = {
+  email?: string
+  user_metadata?: {
+    full_name?: string
+    name?: string
+  }
+}
+
 
 export default function Home() {
   const router = useRouter()
+  const [user, setUser] = useState<HeaderUser | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+
+    const loadUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      setUser(user as HeaderUser | null)
+    }
+
+    loadUser()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser((session?.user as HeaderUser) ?? null)
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  const userDisplayName = useMemo(() => {
+    if (!user) return 'Usuario'
+
+    return (
+      user.user_metadata?.full_name ||
+      user.user_metadata?.name ||
+      user.email ||
+      'Usuario'
+    )
+  }, [user])
+
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800 flex flex-col justify-between">
@@ -15,14 +67,18 @@ export default function Home() {
           <Sparkles className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           <span className="text-xl font-bold text-gray-900 dark:text-white">Nombre por confirmar</span>
         </div>
-        {/* TO DO: Esto deberia redirigir a un inicio de sesión antes del chat */}
-        <Button 
-          variant="ghost"
-          onClick={() => router.push('/chats')}
-          className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-        >
-          Chatea ya!
-        </Button>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-gray-700 dark:text-gray-200">
+            Hola, <span className="font-semibold">{userDisplayName}</span>
+          </p>
+          <Button
+            variant="ghost"
+            onClick={handleLogout}
+            className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+          >
+            Cerrar sesión
+          </Button>
+        </div>
       </nav>
 
       {/* Hero Section */}
