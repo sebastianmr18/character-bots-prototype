@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import type { Message, Character } from "@/types/chat.types"
+import { normalizeBackendMessages } from "@/utils/message.utils"
 
 interface CharacterReference {
     id: string;
@@ -45,7 +46,7 @@ export const useConversation = (initialConversationId: string) => {
                 console.log("Conversación cargada:", data)
                 
                 setSelectedCharacter(data.character)
-                setMessages(data.messages || [])
+                setMessages(normalizeBackendMessages(data.messages || []))
 
             } catch (error) {
                 console.error("Error al cargar la conversación:", error)

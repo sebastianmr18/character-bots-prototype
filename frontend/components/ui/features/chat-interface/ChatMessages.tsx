@@ -1,5 +1,6 @@
 import type React from "react"
 import type { Message, CharacterReference } from "@/types/chat.types"
+import { AudioMessagePlayer } from "./AudioMessagePlayer"
 
 interface ChatMessagesProps {
   messages: Message[]
@@ -7,6 +8,7 @@ interface ChatMessagesProps {
   selectedCharacterId: string | null
   conversationId: string | null
   messagesEndRef: React.RefObject<HTMLDivElement | null>
+  resolveAudioUrl: (messageId: number | string, forceRefresh?: boolean) => Promise<{ audioUrl: string | null; mediaType?: string | null }>
 }
 
 export const ChatMessages: React.FC<ChatMessagesProps> = ({
@@ -15,6 +17,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   selectedCharacterId,
   conversationId,
   messagesEndRef,
+  resolveAudioUrl,
 }) => {
   if (messages.length === 0) {
     return (
@@ -79,6 +82,14 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
               `}
             >
               <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+              {msg.role === "assistant" && (
+                <AudioMessagePlayer
+                  messageId={msg.id}
+                  initialAudioUrl={msg.audioUrl}
+                  mediaType={msg.mediaType}
+                  resolveAudioUrl={resolveAudioUrl}
+                />
+              )}
             </div>
           </div>
         </div>

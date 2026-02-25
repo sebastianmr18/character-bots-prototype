@@ -2,6 +2,16 @@
 
 import { useRef, useState, useCallback } from "react"
 
+const AUDIO_MIME_TYPE = "audio/webm;codecs=opus"
+
+export const getMediaRecorder = (stream: MediaStream): MediaRecorder => {
+  if (!MediaRecorder.isTypeSupported(AUDIO_MIME_TYPE)) {
+    throw new Error(`El formato ${AUDIO_MIME_TYPE} no está soportado en este navegador.`)
+  }
+
+  return new MediaRecorder(stream, { mimeType: AUDIO_MIME_TYPE })
+}
+
 export const useVoiceRecording = () => {
   const mediaRecorder = useRef<MediaRecorder | null>(null)
   const audioChunks = useRef<Blob[]>([])
@@ -19,7 +29,7 @@ export const useVoiceRecording = () => {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      mediaRecorder.current = new MediaRecorder(stream)
+      mediaRecorder.current = getMediaRecorder(stream)
       audioChunks.current = []
 
       mediaRecorder.current.ondataavailable = (event) => {
@@ -41,7 +51,7 @@ export const useVoiceRecording = () => {
       updateLevel()
     } catch (err) {
       console.error("Error al acceder al micrófono:", err)
-      alert("Necesitas dar permiso al micrófono.")
+      alert("Necesitas dar permiso al micrófono o usar un navegador compatible con audio/webm;codecs=opus.")
     }
   }, [])
 

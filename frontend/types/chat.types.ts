@@ -1,7 +1,14 @@
 export interface Message {
-  id: number
+  id: number | string
   role: "user" | "assistant"
   content: string
+  audioPath?: string | null
+  audioUrl?: string | null
+  audioStorageId?: string | null
+  mediaType?: string | null
+  durationMs?: number | null
+  timestamp?: string
+  conversationId?: string
 }
 
 export interface CharacterReference {
@@ -32,6 +39,20 @@ export interface WebSocketMessage {
   message?: string
   text?: string
   audio?: string
+}
+
+export interface AiMessagePayload {
+  message_id?: number | string
+  messageId?: number | string
+  text: string
+  content?: string
+  audio?: string
+  audioPath?: string | null
+  audio_path?: string | null
+  audioUrl?: string | null
+  audio_url?: string | null
+  mediaType?: string | null
+  media_type?: string | null
 }
 
 export interface StatusDisplayConfig {

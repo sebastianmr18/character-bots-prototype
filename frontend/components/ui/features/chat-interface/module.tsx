@@ -13,6 +13,7 @@ import { ChatInput } from "@/components/ui/features/chat-interface/ChatInput";
 import { ChatMessages } from "@/components/ui/features/chat-interface/ChatMessages";
 import { Button } from "@/components/ui/button"
 import { Moon, Sun, Phone } from 'lucide-react'
+import { normalizeBackendMessages } from "@/utils/message.utils"
 
 const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId }) => {
   const router = useRouter()
@@ -84,12 +85,12 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
           console.log("[DEBUG] Enviando mensaje de audio al backend")
           sendAudioMessage(base64Data)
           // Iniciar timeout para cerrar modal si no llega transcripción
-          transcriptionTimeoutRef.current = setTimeout(() => {
+          /*transcriptionTimeoutRef.current = setTimeout(() => {
             console.log("[DEBUG] Timeout: no llegó transcripción, cerrando modal")
             setShowVoiceModal(false)
             setVoiceTranscription("")
             setStatus("Listo")
-          }, 10000) // 10 segundos
+          }, 10000) // 10 segundos*/
         } else {
           console.log("[DEBUG] No se recibió base64Data, no se envía mensaje")
         }
@@ -132,6 +133,47 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
     setVoiceTranscription("")
     setStatus("Listo")
   }
+
+  const resolveAudioUrl = useCallback(
+    async (messageId: number | string, forceRefresh = false) => {
+      if (!conversationId) {
+        return { audioUrl: null, mediaType: null }
+      }
+
+      if (!forceRefresh) {
+        const localMessage = messages.find((message) => String(message.id) === String(messageId))
+        if (localMessage?.audioUrl) {
+          return {
+            audioUrl: localMessage.audioUrl,
+            mediaType: localMessage.mediaType ?? null,
+          }
+        }
+      }
+
+      const response = await fetch(`/api/conversations/${conversationId}`, { cache: "no-store" })
+      if (!response.ok) {
+        return { audioUrl: null, mediaType: null }
+      }
+
+      const data = await response.json()
+      const normalizedMessages = normalizeBackendMessages(data.messages || [])
+
+      setMessages((prev) => {
+        const updatesById = new Map(normalizedMessages.map((message) => [String(message.id), message]))
+        return prev.map((message) => {
+          const updated = updatesById.get(String(message.id))
+          return updated ? { ...message, ...updated } : message
+        })
+      })
+
+      const refreshedMessage = normalizedMessages.find((message) => String(message.id) === String(messageId))
+      return {
+        audioUrl: refreshedMessage?.audioUrl ?? null,
+        mediaType: refreshedMessage?.mediaType ?? null,
+      }
+    },
+    [conversationId, messages, setMessages]
+  )
 
   // Renderizado
   return (
@@ -184,6 +226,7 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
             selectedCharacterId={selectedCharacterId} // Suministrado por useConversation
             conversationId={conversationId}
             messagesEndRef={messagesEndRef}
+            resolveAudioUrl={resolveAudioUrl}
           />
         </div>
 
