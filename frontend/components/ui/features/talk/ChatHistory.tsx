@@ -20,7 +20,7 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({ history }) => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
           </svg>
         </div>
-        <p className="text-xl italic font-serif text-stone-600">"Call Sofia to start your stay"</p>
+        <p className="text-xl italic font-serif text-stone-600">&quot;Call Sofia to start your stay&quot;</p>
         <p className="text-xs mt-2 uppercase tracking-widest font-bold text-stone-500">The Andean Pearl • Luxury Service</p>
       </div>
     );

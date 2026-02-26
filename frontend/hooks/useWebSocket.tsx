@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import { io, Socket } from "socket.io-client"
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { WS_URL } from "@/constants/chat.constants"
 import type { Message, AiMessagePayload } from "@/types/chat.types"
 import { normalizeBackendMessages } from "@/utils/message.utils"

@@ -1,4 +1,5 @@
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useRef, useCallback } from 'react';
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 import { Transcription, ConnectionStatus } from '@/types/live.types';
@@ -87,26 +88,26 @@ if (message.toolCall) {
   if (functionCalls && functionCalls.length > 0) {
     const functionCall = functionCalls[0];
     const { name, args, id } = functionCall;
+    const functionName = typeof name === 'string' ? name : '';
+    const toolCallId = typeof id === 'string' ? id : '';
 
-    // Ejecutar RAG (asíncrono, no bloquear)
-    executeRAGQuery(name, args).then(resultText => {
-      console.log(activeSessionRef)
-      console.log("id", id, "resulText", resultText)
-      activeSessionRef.current.sendToolResponse({
-        id: id,
-        response: JSON.stringify({
-          context: resultText
-        })
+    if (functionName && toolCallId && activeSessionRef.current) {
+      // Ejecutar RAG (asíncrono, no bloquear)
+      executeRAGQuery(functionName, args ?? {}).then(resultText => {
+        activeSessionRef.current?.sendToolResponse({
+          id: toolCallId,
+          response: JSON.stringify({
+            context: resultText
+          })
+        });
       });
-
-
-    });
+    }
   }
   return;
 }
 
     // 3. Manejo de Audio (Igual que antes)
-    const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+    const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
     if (base64Audio && audioContextsRef.current) {
       const { output } = audioContextsRef.current;
       nextStartTimeRef.current = Math.max(nextStartTimeRef.current, output.currentTime);

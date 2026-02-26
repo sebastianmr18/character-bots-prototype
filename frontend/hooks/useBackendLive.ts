@@ -1,4 +1,5 @@
 // frontend/hooks/useBackendLive.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import io, { Socket } from 'socket.io-client';
