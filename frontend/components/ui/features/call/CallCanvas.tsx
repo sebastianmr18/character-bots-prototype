@@ -114,8 +114,8 @@ Comportamiento:
       </div>
 
       <footer className="mt-8 text-stone-400 text-[10px] text-center max-w-lg leading-relaxed uppercase tracking-widest opacity-80">
-        <p>© 2024 The Andean Pearl Luxury Hotel • Boutique Hospitality • Medellín, Colombia</p>
-        <p className="mt-1">Built with Gemini Live API Architecture</p>
+        <p>Prototipo</p>
+        <p className="mt-1">Hecho con Gemini Live API Architecture</p>
       </footer>
     </div>
   );

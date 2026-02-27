@@ -36,7 +36,7 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({ history }) => {
               : 'bg-white text-stone-800 rounded-tl-none border border-stone-200'
           }`}>
             <p className="font-bold text-[10px] uppercase tracking-tighter mb-1 opacity-50">
-              {chat.role === 'user' ? 'You' : 'Character'}
+              {chat.role === 'user' ? 'You' : 'Personaje'}
             </p>
             {chat.text}
           </div>

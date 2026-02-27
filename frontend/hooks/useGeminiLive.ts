@@ -6,7 +6,7 @@ import { Transcription, ConnectionStatus } from '@/types/live.types';
 import { decode, decodeAudioData, createBlobFromFloat32 } from '@/utils/live-audio.utils';
 import { RAG_TOOLS } from '@/types/live.types';
 
-const MODEL_NAME = 'gemini-2.5-flash-native-audio-preview-09-2025';
+const MODEL_NAME = 'gemini-2.5-flash-native-audio-preview-12-2025';
 
 export const useGeminiLive = (systemInstruction: string, characterId: string) => {
   const [status, setStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED);
@@ -83,6 +83,7 @@ const executeRAGQuery = async (functionName: string, args: any): Promise<string>
     }
 
     // 2. Manejo de Llamadas a Herramientas (Tool Call)
+    /*
 if (message.toolCall) {
   const functionCalls = message.toolCall.functionCalls;
   if (functionCalls && functionCalls.length > 0) {
@@ -105,7 +106,7 @@ if (message.toolCall) {
   }
   return;
 }
-
+*/
     // 3. Manejo de Audio (Igual que antes)
     const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
     if (base64Audio && audioContextsRef.current) {

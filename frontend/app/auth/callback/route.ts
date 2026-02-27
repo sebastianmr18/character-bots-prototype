@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     
     if (!error) {
       const forwardedHost = request.headers.get('x-forwarded-host')
-      const isLocalEnv = process.env.NODE_ENV === 'development'
+      const isLocalEnv = process.env.VERCEL_ENV === 'development'
       
       if (isLocalEnv) {
         return NextResponse.redirect(`${origin}${next}`)

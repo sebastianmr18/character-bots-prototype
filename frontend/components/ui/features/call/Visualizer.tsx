@@ -19,7 +19,7 @@ export const Visualizer: React.FC = () => {
       </div>
       <div className="text-center">
         <p className="text-[10px] text-stone-400 font-bold tracking-[0.2em] uppercase">Voice Call Active</p>
-        <p className="text-[9px] text-[#d4af37] font-medium italic">Character is listening</p>
+        <p className="text-[9px] text-[#d4af37] font-medium italic">El personaje esta escuchando</p>
       </div>
       <div className="flex items-center gap-1.5 h-8">
         {[...Array(12)].map((_, i) => (
