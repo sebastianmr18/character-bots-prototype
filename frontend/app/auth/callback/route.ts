@@ -12,10 +12,16 @@ export async function GET(request: Request) {
     
     if (!error) {
       const forwardedHost = request.headers.get('x-forwarded-host')
-      const redirectUrl = forwardedHost 
-        ? `https://${forwardedHost}${next}`
-        : `${origin}${next}`
-      return NextResponse.redirect(redirectUrl)
+      const isLocalEnv = process.env.NODE_ENV === 'development'
+      
+      if (isLocalEnv) {
+        return NextResponse.redirect(`${origin}${next}`)
+      } else if (forwardedHost) {
+        console.log('Redirecting to:', `https://${forwardedHost}${next}`)
+        return NextResponse.redirect(`https://${forwardedHost}${next}`)
+      } else {
+        return NextResponse.redirect(`${origin}${next}`)
+      }
     }
   }
 
