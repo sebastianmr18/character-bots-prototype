@@ -8,6 +8,7 @@ export async function GET() {
       data: { session },
       error: sessionError,
     } = await supabase.auth.getSession()
+    console.log(session?.access_token);
 
     if (sessionError || !session?.access_token) {
       return NextResponse.json(
