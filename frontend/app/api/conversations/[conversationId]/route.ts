@@ -71,3 +71,82 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     )
   }
 }
+
+export async function DELETE(_request: NextRequest, context: RouteContext) {
+  try {
+    const { conversationId } = await context.params
+
+    const supabase = await createClient()
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession()
+
+    if (sessionError || !session?.access_token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!process.env.BACKEND_URL) {
+      return NextResponse.json(
+        { error: 'BACKEND_URL is not configured' },
+        { status: 500 },
+      )
+    }
+
+    const response = await fetch(
+      `${process.env.BACKEND_URL}/conversations/${conversationId}/`,
+      {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        cache: 'no-store',
+      },
+    )
+
+    if (response.status === 204) {
+      return new NextResponse(null, { status: 204 })
+    }
+
+    const responseText = await response.text()
+
+    if (!response.ok) {
+      try {
+        return NextResponse.json(JSON.parse(responseText), {
+          status: response.status,
+        })
+      } catch {
+        return NextResponse.json(
+          {
+            error: responseText || 'Backend request failed',
+          },
+          { status: response.status },
+        )
+      }
+    }
+
+    if (!responseText) {
+      return new NextResponse(null, { status: response.status })
+    }
+
+    try {
+      return NextResponse.json(JSON.parse(responseText), {
+        status: response.status,
+      })
+    } catch {
+      return new NextResponse(responseText, {
+        status: response.status,
+        headers: {
+          'Content-Type': response.headers.get('content-type') ?? 'text/plain',
+        },
+      })
+    }
+  } catch (error) {
+    console.error('Conversation By Id Proxy Error (DELETE):', error)
+
+    return NextResponse.json(
+      { error: 'Conversation unavailable' },
+      { status: 500 },
+    )
+  }
+}

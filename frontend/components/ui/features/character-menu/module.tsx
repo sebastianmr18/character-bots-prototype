@@ -7,7 +7,6 @@ import { ChatListItem } from '@/components/ui/features/character-menu/ChatListIt
 import { CreateCharacterModal } from '@/components/ui/features/character-menu/CreateCharacterModal'
 import type { Character, Conversation } from '@/types/chat.types'
 import { ArrowLeft, Sparkles, MessageSquare } from 'lucide-react'
-import { generateUUID } from '@/utils/uuid.utils'
 
 // Se define el tipo para la estructura de agrupación
 type GroupedChats = {
@@ -65,11 +64,30 @@ const groupConversationsByCharacter = (
 
 export default function ChatsConversationsPage() {
   const router = useRouter()
-  const [characters, setCharacters] = useState<Character[]>([])
   const [loading, setLoading] = useState(true)
+  const [creatingCharacterId, setCreatingCharacterId] = useState<string | null>(null)
+  const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null)
   const [groupedChats, setGroupedChats] = useState<GroupedChats>({})
 
-      const fetchAllData = async () => {
+  const getErrorMessage = async (response: Response): Promise<string> => {
+    try {
+      const errorBody = await response.json()
+
+      if (typeof errorBody?.error === 'string' && errorBody.error.trim().length > 0) {
+        return errorBody.error
+      }
+
+      if (typeof errorBody?.details === 'string' && errorBody.details.trim().length > 0) {
+        return errorBody.details
+      }
+    } catch {
+      return `HTTP ${response.status}`
+    }
+
+    return `HTTP ${response.status}`
+  }
+
+  const fetchAllData = useCallback(async () => {
       try {
         setLoading(true)
         
@@ -84,8 +102,6 @@ export default function ChatsConversationsPage() {
 
         const charactersData: Character[] = await charResponse.json()
         const conversationsData: Conversation[] = await convResponse.json()
-
-        setCharacters(charactersData)
         
         // Agrupación
         const grouped = groupConversationsByCharacter(charactersData, conversationsData)
@@ -96,50 +112,80 @@ export default function ChatsConversationsPage() {
       } finally {
         setLoading(false)
       }
-    }
+    }, [])
 
   // 1. Carga de datos y Agrupación
   useEffect(() => {
     fetchAllData()
-  }, [])
+  }, [fetchAllData])
 
   const handleConversationSelect = useCallback((conversationId: string) => {
     router.push(`/chats/${conversationId}`)
   }, [router])
   
-  // TODO: Manejador para la creación de un nuevo chat (asumiendo flujo POST)
   const handleNewConversation = useCallback(async (characterId: string) => {
-    // 💡 Aquí se realizaría la llamada real al backend
-    // para crear una nueva conversación con el characterId
-    
-    // --- Lógica simulada de POST al Backend ---
-
-    alert("Crear nuevo chat función por implementar")
-    
-    const tempConversationId = generateUUID() 
-    
-    console.log(`Simulando POST /conversations/ con Character ID: ${characterId}. Redirigiendo a: ${tempConversationId}`)
-    
     try {
-        // En una implementación real, la respuesta del POST contendría el nuevo ID.
-        /*
-        const response = await fetch(`${API_BASE_URL}/conversations/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ characterId: characterId }) 
-        });
-        const newConv = await response.json();
-        const newConvId = newConv.id;
-        */
-        
-        // Redirección con el ID (simulado o real)
-        router.push(`/chats/${tempConversationId}`) 
-        
+      setCreatingCharacterId(characterId)
+
+      const response = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ characterId }),
+      })
+
+      if (!response.ok) {
+        const message = await getErrorMessage(response)
+        throw new Error(message)
+      }
+
+      const newConversation: Conversation = await response.json()
+      const newConversationId = newConversation?.id
+
+      if (!newConversationId) {
+        throw new Error('No se recibió el id de la conversación')
+      }
+
+      await fetchAllData()
+      router.push(`/chats/${newConversationId}`)
     } catch (error) {
-        console.error('Error al crear nueva conversación:', error);
-        alert('Error al iniciar nuevo chat. Inténtalo de nuevo.')
+      console.error('Error al crear nueva conversación:', error)
+      const message = error instanceof Error ? error.message : 'Error al iniciar nuevo chat'
+      alert(message)
+    } finally {
+      setCreatingCharacterId(null)
     }
-  }, [router])
+  }, [fetchAllData, router])
+
+  const handleDeleteConversation = useCallback(async (conversationId: string) => {
+    const shouldDelete = window.confirm('¿Eliminar esta conversación? Esta acción no se puede deshacer.')
+
+    if (!shouldDelete) {
+      return
+    }
+
+    try {
+      setDeletingConversationId(conversationId)
+
+      const response = await fetch(`/api/conversations/${conversationId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const message = await getErrorMessage(response)
+        throw new Error(message)
+      }
+
+      await fetchAllData()
+    } catch (error) {
+      console.error('Error al eliminar conversación:', error)
+      const message = error instanceof Error ? error.message : 'Error al eliminar la conversación'
+      alert(message)
+    } finally {
+      setDeletingConversationId(null)
+    }
+  }, [fetchAllData])
 
   // 3. Renderizado
   if (loading) {
@@ -200,9 +246,10 @@ export default function ChatsConversationsPage() {
                     </h2>
                     <Button 
                         onClick={() => handleNewConversation(character.id)}
+                      disabled={creatingCharacterId === character.id}
                         className="mt-3 sm:mt-0 bg-green-600 hover:bg-green-700 text-white font-semibold"
                     >
-                        + Iniciar Nueva Charla
+                      {creatingCharacterId === character.id ? 'Creando...' : '+ Iniciar Nueva Charla'}
                     </Button>
                 </div>
                 
@@ -214,6 +261,8 @@ export default function ChatsConversationsPage() {
                             key={conversation.id} 
                             conversation={conversation} 
                             onClick={handleConversationSelect}
+                            onDelete={handleDeleteConversation}
+                            isDeleting={deletingConversationId === conversation.id}
                           />
                         ))
                     ) : (

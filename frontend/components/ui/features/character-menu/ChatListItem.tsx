@@ -1,27 +1,31 @@
 'use client'
 
 import type React from 'react'
-import { useRouter } from 'next/navigation'
-import { MessageSquare, Clock, ArrowRight } from 'lucide-react'
+import { MessageSquare, Clock, ArrowRight, Trash2 } from 'lucide-react'
 import type { Conversation } from '@/types/chat.types' // Asume el tipo Conversation
-import { useEffect } from 'react'
+import { Button } from '@/components/ui/button'
 
 interface ChatListItemProps {
   conversation: Conversation
   onClick: (conversationId: string) => void
+  onDelete: (conversationId: string) => void
+  isDeleting?: boolean
 }
 
-export const ChatListItem: React.FC<ChatListItemProps> = ({ conversation, onClick }) => {
-  const lastMessage = conversation.messages.length > 0 
-    ? conversation.messages[conversation.messages.length - 1] 
+export const ChatListItem: React.FC<ChatListItemProps> = ({
+  conversation,
+  onClick,
+  onDelete,
+  isDeleting = false,
+}) => {
+  const messages = conversation.messages ?? []
+  const lastMessage = messages.length > 0
+    ? messages[messages.length - 1]
     : null;
 
   const createdAtDate = new Date(conversation.createdAt);
   const dateString = createdAtDate.toLocaleDateString();
   const timeString = createdAtDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    useEffect(() => {
-    console.log(conversation);
-  }, [conversation]);
 
   return (
     <div 
@@ -52,6 +56,20 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({ conversation, onClic
         <span className='text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1'>
           <Clock className='w-3 h-3'/> {timeString}
         </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={(event) => {
+            event.stopPropagation()
+            onDelete(conversation.id)
+          }}
+          disabled={isDeleting}
+          aria-label="Eliminar conversación"
+          className="text-red-500 hover:text-red-600"
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
         <ArrowRight className='w-4 h-4 text-gray-400 dark:text-gray-500'/>
       </div>
     </div>
