@@ -155,6 +155,12 @@ export const useWebSocketChat = ({
 
         if (errorMessage.includes("unauthorized")) {
           if (hasRetriedUnauthorized || isCancelled) {
+            console.log("[WS AUTH DEBUG] No autenticado (connect_error unauthorized, sin más reintentos)", {
+              hasRetriedUnauthorized,
+              isCancelled,
+              socketConnected: socket?.connected,
+              errorMessage,
+            })
             onStatusChange("No autenticado")
             setDisconnectedState()
             socket?.disconnect()
@@ -166,6 +172,11 @@ export const useWebSocketChat = ({
           const refreshedToken = await fetchAccessToken(true)
 
           if (!refreshedToken || isCancelled || !socket) {
+            console.log("[WS AUTH DEBUG] No autenticado (reautenticación fallida tras unauthorized)", {
+              hasRefreshedToken: Boolean(refreshedToken),
+              isCancelled,
+              hasSocket: Boolean(socket),
+            })
             onStatusChange("No autenticado")
             setDisconnectedState()
             socket?.disconnect()
@@ -263,6 +274,12 @@ export const useWebSocketChat = ({
 
       const accessToken = await fetchAccessToken()
       if (!accessToken || isCancelled) {
+        console.log("[WS AUTH DEBUG] No autenticado (initSocket sin token o cancelado)", {
+          hasAccessToken: Boolean(accessToken),
+          isCancelled,
+          conversationId,
+          selectedCharacterId,
+        })
         onStatusChange("No autenticado")
         setDisconnectedState()
         return
