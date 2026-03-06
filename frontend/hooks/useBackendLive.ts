@@ -6,7 +6,7 @@ import io, { Socket } from 'socket.io-client';
 import { Transcription, ConnectionStatus } from '@/types/live.types';
 import { playAudio, float32ToInt16, clearAudioQueue } from '@/utils/live-audio.utils';
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8000';
+const SOCKET_URL = process.env.NEXT_PUBLIC_WS_BASE_URL || 'http://localhost:8000';
 
 export const useBackendLive = (systemInstruction: string) => {
   const [status, setStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED);
