@@ -22,7 +22,8 @@ export interface Character {
   description: string
   role: string
   biography: string
-  voice_id: string
+  voiceId?: string | null
+  vectorDbName?: string | null
 }
 
 export interface Conversation {

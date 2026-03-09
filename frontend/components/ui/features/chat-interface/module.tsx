@@ -12,7 +12,8 @@ import { StatusIndicator } from "@/components/ui/features/chat-interface/StatusI
 import { ChatInput } from "@/components/ui/features/chat-interface/ChatInput";
 import { ChatMessages } from "@/components/ui/features/chat-interface/ChatMessages";
 import { Button } from "@/components/ui/button"
-import { Moon, Sun, Phone } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { Moon, Sun, Phone, CircleHelp } from 'lucide-react'
 import { normalizeBackendMessages } from "@/utils/message.utils"
 
 const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId }) => {
@@ -25,7 +26,9 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
     setMessages, 
     selectedCharacterId, 
     availableCharacters,
-    characterName
+    characterName,
+    characterBiography,
+    characterDataset,
   } = useConversation(conversationId)
 
   const [showVoiceModal, setShowVoiceModal] = useState(false)
@@ -186,8 +189,24 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 p-6 text-white">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold mb-1">Habla con {characterName || "el personaje"}</h1>
-              <p className="text-sm text-blue-100">Prototipo con RAG</p>
+              <h1 className="text-2xl font-bold mb-1 flex items-center gap-2">
+                <span>Habla con {characterName || "el personaje"}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-center rounded-full text-blue-100 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                      aria-label="Ver biografia del personaje"
+                    >
+                      <CircleHelp className="w-4 h-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={8} className="max-w-xs text-xs leading-relaxed">
+                    {characterDataset}
+                  </TooltipContent>
+                </Tooltip>
+              </h1>
+              <p className="text-sm text-blue-100">{characterBiography}</p>
             </div>
 
             <div className="flex items-center gap-2">

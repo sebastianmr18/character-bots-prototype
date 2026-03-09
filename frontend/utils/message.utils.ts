@@ -1,4 +1,4 @@
-import type { Message } from "@/types/chat.types"
+import type { Character, Message } from "@/types/chat.types"
 
 type BackendMessage = {
   id: number | string
@@ -19,6 +19,13 @@ type BackendMessage = {
   conversation_id?: string
 }
 
+type BackendCharacter = Omit<Character, "voiceId" | "vectorDbName"> & {
+  voiceId?: string | null
+  voice_id?: string | null
+  vectorDbName?: string | null
+  vector_db_name?: string | null
+}
+
 export const normalizeBackendMessage = (message: BackendMessage): Message => ({
   id: message.id,
   role: message.role,
@@ -34,4 +41,14 @@ export const normalizeBackendMessage = (message: BackendMessage): Message => ({
 
 export const normalizeBackendMessages = (messages: BackendMessage[] = []): Message[] => {
   return messages.map(normalizeBackendMessage)
+}
+
+export const normalizeBackendCharacter = (character: BackendCharacter): Character => ({
+  ...character,
+  voiceId: character.voiceId ?? character.voice_id ?? null,
+  vectorDbName: character.vectorDbName ?? character.vector_db_name ?? null,
+})
+
+export const normalizeBackendCharacters = (characters: BackendCharacter[] = []): Character[] => {
+  return characters.map(normalizeBackendCharacter)
 }
