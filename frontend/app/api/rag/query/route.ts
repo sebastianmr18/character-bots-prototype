@@ -1,34 +1,73 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const body = await req.json();
+    const supabase = await createClient()
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession()
 
-    const response = await fetch(
-      `${process.env.BACKEND_URL}/query`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      }
-    );
-
-    if (!response.ok) {
-      console.log("RAG Proxy Backend Error:", await response.text());
-      throw new Error("Backend RAG error");
+    if (sessionError || !session?.access_token) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 },
+      )
     }
 
-    const data = await response.json();
+    if (!process.env.BACKEND_URL) {
+      return NextResponse.json(
+        { error: 'BACKEND_URL is not configured' },
+        { status: 500 },
+      )
+    }
 
-    return NextResponse.json(data);
+    const body = await request.text()
+
+    const response = await fetch(`${process.env.BACKEND_URL}/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body,
+      cache: 'no-store',
+    })
+
+    const responseText = await response.text()
+
+    if (!response.ok) {
+      try {
+        return NextResponse.json(JSON.parse(responseText), {
+          status: response.status,
+        })
+      } catch {
+        return NextResponse.json(
+          { error: responseText || 'Backend request failed' },
+          { status: response.status },
+        )
+      }
+    }
+
+    try {
+      return NextResponse.json(JSON.parse(responseText), {
+        status: response.status,
+      })
+    } catch {
+      return new NextResponse(responseText, {
+        status: response.status,
+        headers: {
+          'Content-Type': response.headers.get('content-type') ?? 'text/plain',
+        },
+      })
+    }
   } catch (error) {
-    console.error("RAG Proxy Error:", error);
+    console.error('RAG Query Proxy Error:', error)
 
     return NextResponse.json(
-      { context: "", error: "RAG unavailable" },
-      { status: 500 }
-    );
+      { context: '', error: 'RAG unavailable' },
+      { status: 500 },
+    )
   }
 }

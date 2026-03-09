@@ -83,30 +83,42 @@ const executeRAGQuery = async (functionName: string, args: any): Promise<string>
     }
 
     // 2. Manejo de Llamadas a Herramientas (Tool Call)
-    /*
-if (message.toolCall) {
-  const functionCalls = message.toolCall.functionCalls;
-  if (functionCalls && functionCalls.length > 0) {
-    const functionCall = functionCalls[0];
-    const { name, args, id } = functionCall;
-    const functionName = typeof name === 'string' ? name : '';
-    const toolCallId = typeof id === 'string' ? id : '';
 
-    if (functionName && toolCallId && activeSessionRef.current) {
-      // Ejecutar RAG (asíncrono, no bloquear)
-      executeRAGQuery(functionName, args ?? {}).then(resultText => {
-        activeSessionRef.current?.sendToolResponse({
-          id: toolCallId,
-          response: JSON.stringify({
-            context: resultText
-          })
+    if (message.toolCall) {
+      const functionCalls = message.toolCall.functionCalls;
+      if (functionCalls && functionCalls.length > 0) {
+        functionCalls.forEach((functionCall) => {
+          const { name, args, id } = functionCall;
+          const functionName = typeof name === 'string' ? name : '';
+          const toolCallId = typeof id === 'string' ? id : '';
+
+          if (!functionName || !toolCallId || !activeSessionRef.current) return;
+
+          // Ejecutar RAG (asincrono, no bloquear)
+          void executeRAGQuery(functionName, args ?? {})
+            .then((resultText) => {
+              try {
+                activeSessionRef.current?.sendToolResponse({
+                  functionResponses: {
+                    id: toolCallId,
+                    name: functionName,
+                    response: {
+                      context: resultText,
+                    },
+                  },
+                });
+              } catch (error) {
+                console.error('%c❌ RAG: Error enviando tool response', 'color: #e74c3c; font-weight: bold;', error);
+              }
+            })
+            .catch((error) => {
+              console.error('%c❌ RAG: Error procesando tool call', 'color: #e74c3c; font-weight: bold;', error);
+            });
         });
-      });
+      }
+      return;
     }
-  }
-  return;
-}
-*/
+
     // 3. Manejo de Audio (Igual que antes)
     const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
     if (base64Audio && audioContextsRef.current) {
