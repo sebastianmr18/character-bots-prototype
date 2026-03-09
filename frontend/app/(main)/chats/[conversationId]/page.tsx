@@ -8,7 +8,7 @@ export default function ChatPage() {
   const conversationId = params.conversationId as string
 
   return (
-    <main className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 p-0 sm:p-4">
+    <main className="flex h-dvh overflow-hidden items-center justify-center bg-gray-100 dark:bg-gray-900 p-0 sm:p-4">
       <ChatInterface conversationId={conversationId} />
     </main>
   )

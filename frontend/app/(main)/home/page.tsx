@@ -146,7 +146,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="py-8 px-6 text-center border-t border-gray-200 dark:border-gray-700">
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Prototipo con RAG y ElevenLabs • Respuestas con audio incluido • En desarrollo!
+          Prototipo con RAG • Respuestas con audio incluido • En desarrollo!
         </p>
       </footer>
     </main>

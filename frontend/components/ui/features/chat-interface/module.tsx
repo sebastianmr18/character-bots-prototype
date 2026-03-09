@@ -177,9 +177,9 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
 
   // Renderizado
   return (
-    <div className="flex w-full min-h-screen">
+    <div className="flex w-full h-full min-h-0">
       <div
-        className="w-full min-h-screen flex flex-col rounded-2xl border border-gray-200 shadow-2xl 
+        className="w-full h-full min-h-0 flex flex-col rounded-2xl border border-gray-200 shadow-2xl 
                    bg-white dark:bg-gray-900 dark:border-gray-700 
                    text-gray-900 dark:text-gray-100 transition-all duration-300 overflow-hidden"
       >
@@ -187,7 +187,7 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold mb-1">Habla con {characterName || "el personaje"}</h1>
-              <p className="text-sm text-blue-100">Prototipo con RAG y ElevenLabs</p>
+              <p className="text-sm text-blue-100">Prototipo con RAG</p>
             </div>
 
             <div className="flex items-center gap-2">
@@ -219,7 +219,7 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50 dark:bg-gray-800/50">
+        <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4 bg-gray-50 dark:bg-gray-800/50">
           <ChatMessages
             messages={messages}
             availableCharacters={availableCharacters} // Suministrado por useConversation
