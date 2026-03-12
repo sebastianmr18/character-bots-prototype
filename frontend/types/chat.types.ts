@@ -51,6 +51,7 @@ export interface Character {
 export interface Conversation {
   id: string
   createdAt: string
+  characterId?: string
   character: Character
   messages: Message[]
 }

@@ -176,6 +176,92 @@ export const normalizeBackendCharacters = (characters: BackendCharacter[] = []):
   return characters.map(normalizeBackendCharacter)
 }
 
+// ---------------------------------------------------------------------------
+// Message collection helpers (used by useWebSocket and useMessagePolling)
+// ---------------------------------------------------------------------------
+
+export const hasAssistantAudio = (message: Message): boolean =>
+  Boolean(message.audioUrl || message.audioPath || message.audioStorageId)
+
+const hasMessageChanged = (current: Message, incoming: Message): boolean => {
+  const currentBlocks = JSON.stringify(current.blocks ?? [])
+  const incomingBlocks = JSON.stringify(incoming.blocks ?? [])
+  return (
+    current.content !== incoming.content ||
+    current.schemaVersion !== incoming.schemaVersion ||
+    currentBlocks !== incomingBlocks ||
+    current.audioPath !== incoming.audioPath ||
+    current.audioUrl !== incoming.audioUrl ||
+    current.audioStorageId !== incoming.audioStorageId ||
+    current.mediaType !== incoming.mediaType ||
+    current.durationMs !== incoming.durationMs ||
+    current.timestamp !== incoming.timestamp
+  )
+}
+
+const mergeMessagesSafely = (current: Message, incoming: Message): Message => {
+  const shouldReplaceContent =
+    incoming.content.trim().length > 0 || current.content.trim().length === 0
+  return {
+    ...current,
+    ...incoming,
+    content: shouldReplaceContent ? incoming.content : current.content,
+    schemaVersion: incoming.schemaVersion ?? current.schemaVersion,
+    blocks: incoming.blocks ?? current.blocks,
+    metadata: incoming.metadata ?? current.metadata,
+    audioPath: incoming.audioPath ?? current.audioPath,
+    audioUrl: incoming.audioUrl ?? current.audioUrl,
+    audioStorageId: incoming.audioStorageId ?? current.audioStorageId,
+    mediaType: incoming.mediaType ?? current.mediaType,
+    durationMs: incoming.durationMs ?? current.durationMs,
+    timestamp: incoming.timestamp ?? current.timestamp,
+  }
+}
+
+export const mergeMessageCollection = (
+  prev: Message[],
+  incomingMessages: Message[],
+): Message[] => {
+  if (incomingMessages.length === 0) return prev
+
+  const next = [...prev]
+  let didChange = false
+
+  incomingMessages.forEach((incoming) => {
+    const byIdIndex = next.findIndex(
+      (message) => String(message.id) === String(incoming.id),
+    )
+
+    if (byIdIndex >= 0) {
+      const merged = mergeMessagesSafely(next[byIdIndex], incoming)
+      if (hasMessageChanged(next[byIdIndex], merged)) {
+        next[byIdIndex] = merged
+        didChange = true
+      }
+      return
+    }
+
+    const byRoleContentIndex = next.findIndex(
+      (message) =>
+        message.role === incoming.role && message.content === incoming.content,
+    )
+
+    if (byRoleContentIndex >= 0) {
+      const merged = mergeMessagesSafely(next[byRoleContentIndex], incoming)
+      if (hasMessageChanged(next[byRoleContentIndex], merged)) {
+        next[byRoleContentIndex] = merged
+        didChange = true
+      }
+      return
+    }
+
+    next.push(incoming)
+    didChange = true
+  })
+
+  return didChange ? next : prev
+}
+
 export const normalizeAiMessagePayload = (payload: AiMessagePayload): Message => {
   const messageText = payload.text ?? payload.content ?? ""
   const messageId = payload.message_id ?? payload.messageId ?? `ws-${Date.now()}`

@@ -1,48 +1,49 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ArrowRight, Sparkles, MessageCircle, Zap } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { useAuth } from '@/hooks/useAuth'
 
-type HeaderUser = {
-  email?: string
-  user_metadata?: {
-    full_name?: string
-    name?: string
-  }
-}
+const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || 'Character Bots'
+
+const FEATURE_CARDS = [
+  {
+    id: 'chat',
+    icon: MessageCircle,
+    iconClassName: 'text-blue-600 dark:text-blue-400',
+    title: 'Chat Natural',
+    description: 'Conversaciones fluidas y contextuales con IA',
+  },
+  {
+    id: 'speed',
+    icon: Zap,
+    iconClassName: 'text-yellow-600 dark:text-yellow-400',
+    title: 'Respuestas Rápidas',
+    description: 'Obtén respuestas instantáneas y precisas',
+  },
+  {
+    id: 'voice',
+    icon: Sparkles,
+    iconClassName: 'text-purple-600 dark:text-purple-400',
+    title: 'Audio & Voz',
+    description: 'Interactúa con reconocimiento de voz',
+  },
+] as const
+
+const CTA_ITEMS = [
+  { id: 'chats', label: 'Chatea ya!', path: '/chats' },
+  { id: 'talk', label: 'Conversa ya!', path: '/talk' },
+] as const
 
 
 export default function Home() {
   const router = useRouter()
-  const [user, setUser] = useState<HeaderUser | null>(null)
-
-  useEffect(() => {
-    const supabase = createClient()
-
-    const loadUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      setUser(user as HeaderUser | null)
-    }
-
-    loadUser()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser((session?.user as HeaderUser) ?? null)
-    })
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
+  const { user, isLoading, logout } = useAuth()
 
   const userDisplayName = useMemo(() => {
+    if (isLoading) return '...'
     if (!user) return 'Usuario'
 
     return (
@@ -51,13 +52,9 @@ export default function Home() {
       user.email ||
       'Usuario'
     )
-  }, [user])
+  }, [isLoading, user])
 
-  const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/login')
-  }
+  const showTalkTestButton = process.env.NODE_ENV === 'development'
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800 flex flex-col justify-between">
@@ -65,7 +62,7 @@ export default function Home() {
       <nav className="flex items-center justify-between p-6 max-w-7xl mx-auto w-full">
         <div className="flex items-center gap-2">
           <Sparkles className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-          <span className="text-xl font-bold text-gray-900 dark:text-white">Nombre por confirmar</span>
+          <span className="text-xl font-bold text-gray-900 dark:text-white">{APP_NAME}</span>
         </div>
         <div className="flex items-center gap-3">
           <p className="text-sm text-gray-700 dark:text-gray-200">
@@ -73,7 +70,7 @@ export default function Home() {
           </p>
           <Button
             variant="ghost"
-            onClick={handleLogout}
+            onClick={logout}
             className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
           >
             Cerrar sesión
@@ -96,50 +93,45 @@ export default function Home() {
 
           {/* Features */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            <div className="p-6 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-              <MessageCircle className="w-8 h-8 text-blue-600 dark:text-blue-400 mx-auto mb-3" />
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Chat Natural</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Conversaciones fluidas y contextuales con IA</p>
-            </div>
-            <div className="p-6 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-              <Zap className="w-8 h-8 text-yellow-600 dark:text-yellow-400 mx-auto mb-3" />
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Respuestas Rápidas</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Obtén respuestas instantáneas y precisas</p>
-            </div>
-            <div className="p-6 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-              <Sparkles className="w-8 h-8 text-purple-600 dark:text-purple-400 mx-auto mb-3" />
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Audio & Voz</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Interactúa con reconocimiento de voz</p>
-            </div>
+            {FEATURE_CARDS.map((feature) => {
+              const Icon = feature.icon
+              return (
+                <div
+                  key={feature.id}
+                  className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800"
+                >
+                  <Icon className={`mx-auto mb-3 h-8 w-8 ${feature.iconClassName}`} />
+                  <h3 className="mb-2 font-semibold text-gray-900 dark:text-white">{feature.title}</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{feature.description}</p>
+                </div>
+              )
+            })}
           </div>
 
-          {/* CTA Button 
-          TO DO: Esto deberia redirigir a un inicio de sesión antes del chat
-          */}
-          <Button
-            size="lg"
-            onClick={() => router.push('/chats')}
-            className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white px-8 py-6 text-lg font-semibold rounded-xl flex items-center gap-2 mx-auto"
-          >
-            Chatea ya!
-            <ArrowRight className="w-5 h-5" />
-          </Button>
-          <Button
-            size="lg"
-            onClick={() => router.push('/talk')}
-            className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white px-8 py-6 text-lg font-semibold rounded-xl flex items-center gap-2 mx-auto"
-          >
-            Conversa ya!
-            <ArrowRight className="w-5 h-5" />
-          </Button>
-          <Button
-            size="lg"
-            onClick={() => router.push('/talk-test')}
-            className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white px-8 py-6 text-lg font-semibold rounded-xl flex items-center gap-2 mx-auto"
-          >
-            Conversa ya desde el backend!
-            <ArrowRight className="w-5 h-5" />
-          </Button>
+          <div className="mx-auto flex max-w-sm flex-col gap-3">
+            {CTA_ITEMS.map((item) => (
+              <Button
+                key={item.id}
+                size="lg"
+                onClick={() => router.push(item.path)}
+                className="mx-auto flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-8 py-6 text-lg font-semibold text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+              >
+                {item.label}
+                <ArrowRight className="h-5 w-5" />
+              </Button>
+            ))}
+
+            {showTalkTestButton && (
+              <Button
+                size="lg"
+                onClick={() => router.push('/talk-test')}
+                className="mx-auto flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-8 py-6 text-lg font-semibold text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+              >
+                Conversa ya desde el backend!
+                <ArrowRight className="h-5 w-5" />
+              </Button>
+            )}
+          </div>
         </div>
       </section>
 

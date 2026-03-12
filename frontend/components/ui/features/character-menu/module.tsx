@@ -1,11 +1,21 @@
 'use client'
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { ChatListItem } from '@/components/ui/features/character-menu/ChatListItem'
 import { CreateCharacterModal } from '@/components/ui/features/character-menu/CreateCharacterModal'
 import type { Character, Conversation } from '@/types/chat.types'
+import { getErrorMessage } from '@/utils/api.utils'
 import { ArrowLeft, Sparkles, MessageSquare } from 'lucide-react'
 
 // Se define el tipo para la estructura de agrupación
@@ -24,40 +34,21 @@ const groupConversationsByCharacter = (
   characters: Character[],
   conversations: Conversation[],
 ): GroupedChats => {
-  const charMap: Record<string, Character> = characters.reduce((acc, char) => {
-    acc[char.id] = char
-    return acc
-  }, {} as Record<string, Character>)
+  const grouped: GroupedChats = Object.fromEntries(
+    characters.map((character) => [character.id, { character, chats: [] }]),
+  )
 
-  const grouped: GroupedChats = {}
+  for (const conversation of conversations) {
+    const characterId = conversation.characterId ?? conversation.character?.id
+    if (!characterId || !grouped[characterId]) continue
+    grouped[characterId].chats.push(conversation)
+  }
 
-  conversations.forEach((conv) => {
-    // Asumimos que character es un objeto o tiene una propiedad characterId en la conversación
-    const characterId = (conv as any).characterId || (conv as any).character?.id || null; 
-    
-    if (characterId && charMap[characterId]) {
-      if (!grouped[characterId]) {
-        grouped[characterId] = {
-          character: charMap[characterId],
-          chats: [],
-        }
-      }
-      grouped[characterId].chats.push(conv)
-    }
-  })
-  
-  // Agregar personajes sin chats para que se muestren
-  characters.forEach(char => {
-      // Ordenar los chats descendientemente por fecha de creación
-      const sortedChats = grouped[char.id]?.chats.sort((a, b) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      ) || [];
-      
-      grouped[char.id] = {
-          character: char,
-          chats: sortedChats,
-      }
-  })
+  for (const entry of Object.values(grouped)) {
+    entry.chats.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
+  }
 
   return grouped
 }
@@ -67,25 +58,9 @@ export default function ChatsConversationsPage() {
   const [loading, setLoading] = useState(true)
   const [creatingCharacterId, setCreatingCharacterId] = useState<string | null>(null)
   const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null)
+  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null)
+  const [operationError, setOperationError] = useState<string | null>(null)
   const [groupedChats, setGroupedChats] = useState<GroupedChats>({})
-
-  const getErrorMessage = async (response: Response): Promise<string> => {
-    try {
-      const errorBody = await response.json()
-
-      if (typeof errorBody?.error === 'string' && errorBody.error.trim().length > 0) {
-        return errorBody.error
-      }
-
-      if (typeof errorBody?.details === 'string' && errorBody.details.trim().length > 0) {
-        return errorBody.details
-      }
-    } catch {
-      return `HTTP ${response.status}`
-    }
-
-    return `HTTP ${response.status}`
-  }
 
   const fetchAllData = useCallback(async () => {
       try {
@@ -125,6 +100,7 @@ export default function ChatsConversationsPage() {
   
   const handleNewConversation = useCallback(async (characterId: string) => {
     try {
+      setOperationError(null)
       setCreatingCharacterId(characterId)
 
       const response = await fetch('/api/conversations', {
@@ -152,23 +128,25 @@ export default function ChatsConversationsPage() {
     } catch (error) {
       console.error('Error al crear nueva conversación:', error)
       const message = error instanceof Error ? error.message : 'Error al iniciar nuevo chat'
-      alert(message)
+      setOperationError(message)
     } finally {
       setCreatingCharacterId(null)
     }
   }, [fetchAllData, router])
 
-  const handleDeleteConversation = useCallback(async (conversationId: string) => {
-    const shouldDelete = window.confirm('¿Eliminar esta conversación? Esta acción no se puede deshacer.')
+  const handleDeleteConversation = useCallback((conversationId: string) => {
+    setOperationError(null)
+    setConversationToDelete(conversationId)
+  }, [])
 
-    if (!shouldDelete) {
-      return
-    }
+  const confirmDeleteConversation = useCallback(async () => {
+    if (!conversationToDelete) return
 
     try {
-      setDeletingConversationId(conversationId)
+      setOperationError(null)
+      setDeletingConversationId(conversationToDelete)
 
-      const response = await fetch(`/api/conversations/${conversationId}`, {
+      const response = await fetch(`/api/conversations/${conversationToDelete}`, {
         method: 'DELETE',
       })
 
@@ -181,11 +159,12 @@ export default function ChatsConversationsPage() {
     } catch (error) {
       console.error('Error al eliminar conversación:', error)
       const message = error instanceof Error ? error.message : 'Error al eliminar la conversación'
-      alert(message)
+      setOperationError(message)
     } finally {
+      setConversationToDelete(null)
       setDeletingConversationId(null)
     }
-  }, [fetchAllData])
+  }, [conversationToDelete, fetchAllData])
 
   // 3. Renderizado
   if (loading) {
@@ -232,6 +211,12 @@ export default function ChatsConversationsPage() {
 
       {/* --- Characters Grouped List --- */}
       <div className="max-w-7xl mx-auto px-4 py-12">
+        {operationError && (
+          <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+            {operationError}
+          </div>
+        )}
+
         {allCharacters.length > 0 ? (
           <div className="space-y-12">
             {allCharacters.map(({ character, chats }) => (
@@ -283,6 +268,34 @@ export default function ChatsConversationsPage() {
           </div>
         )}
       </div>
+
+      <AlertDialog
+        open={conversationToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setConversationToDelete(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar conversación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingConversationId !== null}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteConversation}
+              disabled={deletingConversationId !== null}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {deletingConversationId !== null ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   )
 }

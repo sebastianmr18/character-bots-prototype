@@ -8,13 +8,13 @@ import { VoiceRecordingModal } from "@/components/ui/features/chat-interface/Voi
 import { useConversation } from "@/hooks/useConversationId";
 import { useWebSocketChat } from "@/hooks/useWebSocket";
 import { useVoiceRecording } from "@/hooks/useVoiceRecording";
+import { useAudioResolver } from "@/hooks/useAudioResolver";
 import { StatusIndicator } from "@/components/ui/features/chat-interface/StatusIndicator";
 import { ChatInput } from "@/components/ui/features/chat-interface/ChatInput";
 import { ChatMessages } from "@/components/ui/features/chat-interface/ChatMessages";
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Moon, Sun, Phone, CircleHelp } from 'lucide-react'
-import { normalizeBackendMessages } from "@/utils/message.utils"
 
 const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId }) => {
   const router = useRouter()
@@ -43,7 +43,6 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
   }, [setMessages])
 
   const onTranscriptionResult = useCallback((text: string) => {
-    console.log("[DEBUG] Transcripción recibida del backend:", text)
     if (!text.trim()) {
       clearAudioPlaceholder()
       setStatus("Sin transcripción")
@@ -81,13 +80,13 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
 
   const { isRecording, audioLevel, startRecording, stopRecording } = useVoiceRecording()
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+  }, [])
 
   useEffect(() => {
     scrollToBottom()
-  }, [messages])
+  }, [messages, scrollToBottom])
 
   const handleSendMessage = (text: string) => {
     if (!text.trim()) return
@@ -102,32 +101,25 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
   const handleToggleRecording = async () => {
     try {
       if (isRecording) {
-        console.log("[DEBUG] Deteniendo grabación de voz")
         setStatus("Esperando transcripción...")
         const base64Data = await stopRecording()
-        console.log("[DEBUG] Grabación detenida, base64Data recibido:", base64Data ? "Sí" : "No", base64Data ? `(${base64Data.length} chars)` : "")
 
         if (base64Data) {
-          console.log("[DEBUG] Enviando mensaje de audio al backend")
           // Add a placeholder bubble so the user message always appears before the bot response
           const placeholderId = -Date.now()
           audioPlaceholderIdRef.current = placeholderId
           setMessages((prev) => [...prev, { id: placeholderId, role: "user", content: "🎤 Enviando audio..." }])
           sendAudioMessage(base64Data)
-        } else {
-          console.log("[DEBUG] No se recibió base64Data, no se envía mensaje")
         }
         // Close modal immediately — no review step
         setShowVoiceModal(false)
       } else {
-        console.log("[DEBUG] Iniciando grabación de voz")
         await startRecording()
         setStatus("Grabando voz...")
-        console.log("[DEBUG] Grabación iniciada, mostrando modal")
         setShowVoiceModal(true)
       }
     } catch (error) {
-      console.error("[DEBUG] Error en handleToggleRecording:", error)
+      console.error("Error en handleToggleRecording:", error)
       setStatus("Error en grabación")
     }
   }
@@ -138,7 +130,7 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
       try {
         await stopRecording()
       } catch (error) {
-        console.error("[DEBUG] Error al cancelar grabación:", error)
+        console.error("Error al cancelar grabación:", error)
       }
     }
     // If there's a dangling placeholder (recording cancelled before transcription), remove it
@@ -147,46 +139,7 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
     setStatus(isRecording ? "Grabación cancelada" : "Listo")
   }
 
-  const resolveAudioUrl = useCallback(
-    async (messageId: number | string, forceRefresh = false) => {
-      if (!conversationId) {
-        return { audioUrl: null, mediaType: null }
-      }
-
-      if (!forceRefresh) {
-        const localMessage = messages.find((message) => String(message.id) === String(messageId))
-        if (localMessage?.audioUrl) {
-          return {
-            audioUrl: localMessage.audioUrl,
-            mediaType: localMessage.mediaType ?? null,
-          }
-        }
-      }
-
-      const response = await fetch(`/api/conversations/${conversationId}`, { cache: "no-store" })
-      if (!response.ok) {
-        return { audioUrl: null, mediaType: null }
-      }
-
-      const data = await response.json()
-      const normalizedMessages = normalizeBackendMessages(data.messages || [])
-
-      setMessages((prev) => {
-        const updatesById = new Map(normalizedMessages.map((message) => [String(message.id), message]))
-        return prev.map((message) => {
-          const updated = updatesById.get(String(message.id))
-          return updated ? { ...message, ...updated } : message
-        })
-      })
-
-      const refreshedMessage = normalizedMessages.find((message) => String(message.id) === String(messageId))
-      return {
-        audioUrl: refreshedMessage?.audioUrl ?? null,
-        mediaType: refreshedMessage?.mediaType ?? null,
-      }
-    },
-    [conversationId, messages, setMessages]
-  )
+  const resolveAudioUrl = useAudioResolver(conversationId, messages, setMessages)
 
   // Renderizado
   return (
