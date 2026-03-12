@@ -5,7 +5,7 @@ import { io, Socket } from "socket.io-client"
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { WS_URL } from "@/constants/chat.constants"
 import type { Message, AiMessagePayload } from "@/types/chat.types"
-import { normalizeBackendMessages } from "@/utils/message.utils"
+import { normalizeAiMessagePayload, normalizeBackendMessages } from "@/utils/message.utils"
 import { createClient } from "@/lib/supabase/client"
 
 const hasAssistantAudio = (message: Message) => {
@@ -13,8 +13,13 @@ const hasAssistantAudio = (message: Message) => {
 }
 
 const hasMessageChanged = (current: Message, incoming: Message) => {
+  const currentBlocks = JSON.stringify(current.blocks ?? [])
+  const incomingBlocks = JSON.stringify(incoming.blocks ?? [])
+
   return (
     current.content !== incoming.content ||
+    current.schemaVersion !== incoming.schemaVersion ||
+    currentBlocks !== incomingBlocks ||
     current.audioPath !== incoming.audioPath ||
     current.audioUrl !== incoming.audioUrl ||
     current.audioStorageId !== incoming.audioStorageId ||
@@ -22,6 +27,25 @@ const hasMessageChanged = (current: Message, incoming: Message) => {
     current.durationMs !== incoming.durationMs ||
     current.timestamp !== incoming.timestamp
   )
+}
+
+const mergeMessagesSafely = (current: Message, incoming: Message): Message => {
+  const shouldReplaceContent = incoming.content.trim().length > 0 || current.content.trim().length === 0
+
+  return {
+    ...current,
+    ...incoming,
+    content: shouldReplaceContent ? incoming.content : current.content,
+    schemaVersion: incoming.schemaVersion ?? current.schemaVersion,
+    blocks: incoming.blocks ?? current.blocks,
+    metadata: incoming.metadata ?? current.metadata,
+    audioPath: incoming.audioPath ?? current.audioPath,
+    audioUrl: incoming.audioUrl ?? current.audioUrl,
+    audioStorageId: incoming.audioStorageId ?? current.audioStorageId,
+    mediaType: incoming.mediaType ?? current.mediaType,
+    durationMs: incoming.durationMs ?? current.durationMs,
+    timestamp: incoming.timestamp ?? current.timestamp,
+  }
 }
 
 const mergeMessageCollection = (prev: Message[], incomingMessages: Message[]) => {
@@ -34,7 +58,7 @@ const mergeMessageCollection = (prev: Message[], incomingMessages: Message[]) =>
     const byIdIndex = next.findIndex((message) => String(message.id) === String(incoming.id))
 
     if (byIdIndex >= 0) {
-      const mergedMessage = { ...next[byIdIndex], ...incoming }
+      const mergedMessage = mergeMessagesSafely(next[byIdIndex], incoming)
       if (hasMessageChanged(next[byIdIndex], mergedMessage)) {
         next[byIdIndex] = mergedMessage
         didChange = true
@@ -47,7 +71,7 @@ const mergeMessageCollection = (prev: Message[], incomingMessages: Message[]) =>
     )
 
     if (byRoleContentIndex >= 0) {
-      const mergedMessage = { ...next[byRoleContentIndex], ...incoming }
+      const mergedMessage = mergeMessagesSafely(next[byRoleContentIndex], incoming)
       if (hasMessageChanged(next[byRoleContentIndex], mergedMessage)) {
         next[byRoleContentIndex] = mergedMessage
         didChange = true
@@ -68,6 +92,7 @@ interface UseWebSocketChatProps {
   onStatusChange: (status: string) => void
   onMessagesUpdate: (updater: (prev: Message[]) => Message[]) => void
   onTranscriptionResult: (text: string) => void
+  onNoSpeech?: () => void
 }
 
 export const useWebSocketChat = ({
@@ -76,11 +101,13 @@ export const useWebSocketChat = ({
   onStatusChange,
   onMessagesUpdate,
   onTranscriptionResult,
+  onNoSpeech,
 }: UseWebSocketChatProps) => {
   const socketRef = useRef<Socket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const lastMessageCountRef = useRef<number>(0)
+  const lastTranscriptionEventRef = useRef<{ text: string; timestamp: number } | null>(null)
 
   const base64ToObjectUrl = useCallback((base64String: string, mediaType = "audio/mpeg") => {
     const cleanedBase64 = base64String.replace(/\s/g, "")
@@ -203,10 +230,8 @@ export const useWebSocketChat = ({
       socket.on("ai_message", (data: AiMessagePayload) => {
         console.log("[DEBUG] Recibido evento 'ai_message':", data)
 
-        const messageText = data.text ?? data.content ?? ""
-        const messageId = data.message_id ?? data.messageId ?? `ws-${Date.now()}`
-        const audioPath = data.audioPath ?? data.audio_path ?? null
-        const mediaType = data.mediaType ?? data.media_type ?? null
+        const normalizedMessage = normalizeAiMessagePayload(data)
+        const mediaType = normalizedMessage.mediaType ?? null
 
         let audioUrlFromSocket: string | null = data.audioUrl ?? data.audio_url ?? null
         if (!audioUrlFromSocket && data.audio) {
@@ -218,10 +243,7 @@ export const useWebSocketChat = ({
         }
 
         const incomingMessage: Message = {
-          id: messageId,
-          role: "assistant",
-          content: messageText,
-          audioPath,
+          ...normalizedMessage,
           audioUrl: audioUrlFromSocket,
           mediaType,
         }
@@ -243,6 +265,14 @@ export const useWebSocketChat = ({
       const handleTranscription = (data: { text: string }) => {
         console.log("[DEBUG] Recibido evento de transcripción:", data)
         if (data.text) {
+          const now = Date.now()
+          const lastEvent = lastTranscriptionEventRef.current
+          if (lastEvent && lastEvent.text === data.text && now - lastEvent.timestamp < 1500) {
+            console.log("[DEBUG] Evento de transcripción duplicado ignorado")
+            return
+          }
+
+          lastTranscriptionEventRef.current = { text: data.text, timestamp: now }
           onTranscriptionResult(data.text)
         } else {
           console.log("[DEBUG] Transcripción vacía o nula")
@@ -260,6 +290,7 @@ export const useWebSocketChat = ({
 
       socket.on("no_speech", (data: { message: string }) => {
         console.log("[DEBUG] Recibido evento 'no_speech':", data)
+        onNoSpeech?.()
         alert(data.message)
       })
 
@@ -309,7 +340,7 @@ export const useWebSocketChat = ({
       socketRef.current?.disconnect()
       socketRef.current = null
     }
-  }, [conversationId, selectedCharacterId, onStatusChange, onMessagesUpdate, onTranscriptionResult, base64ToObjectUrl])
+  }, [conversationId, selectedCharacterId, onStatusChange, onMessagesUpdate, onTranscriptionResult, onNoSpeech, base64ToObjectUrl])
 
   // Función para hacer polling de nuevos mensajes desde el backend
   const pollForNewMessages = useCallback(async () => {

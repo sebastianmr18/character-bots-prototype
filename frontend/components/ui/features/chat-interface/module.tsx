@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "@/app/providers"
-import { VoiceRecordingModal } from "./VoiceRecordingModal";
+import { VoiceRecordingModal } from "@/components/ui/features/chat-interface/VoiceRecordingModal";
 import { useConversation } from "@/hooks/useConversationId";
 import { useWebSocketChat } from "@/hooks/useWebSocket";
 import { useVoiceRecording } from "@/hooks/useVoiceRecording";
@@ -32,19 +32,41 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
   } = useConversation(conversationId)
 
   const [showVoiceModal, setShowVoiceModal] = useState(false)
-  const [voiceTranscription, setVoiceTranscription] = useState("")
-  const transcriptionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const audioPlaceholderIdRef = useRef<number | null>(null)
+
+  const clearAudioPlaceholder = useCallback(() => {
+    if (audioPlaceholderIdRef.current === null) return
+
+    const placeholderId = audioPlaceholderIdRef.current
+    setMessages((prev) => prev.filter((msg) => String(msg.id) !== String(placeholderId)))
+    audioPlaceholderIdRef.current = null
+  }, [setMessages])
 
   const onTranscriptionResult = useCallback((text: string) => {
     console.log("[DEBUG] Transcripción recibida del backend:", text)
-    if (transcriptionTimeoutRef.current) {
-      clearTimeout(transcriptionTimeoutRef.current)
-      transcriptionTimeoutRef.current = null
+    if (!text.trim()) {
+      clearAudioPlaceholder()
+      setStatus("Sin transcripción")
+      return
     }
-    setVoiceTranscription(text)
-    setShowVoiceModal(true)
-    setStatus("Transcripción recibida. Revisa.")
-  }, [])
+
+    // Replace the placeholder bubble with the real transcription text
+    setMessages((prev) =>
+      prev.map((msg) =>
+        audioPlaceholderIdRef.current !== null && String(msg.id) === String(audioPlaceholderIdRef.current)
+          ? { ...msg, content: text }
+          : msg
+      )
+    )
+    audioPlaceholderIdRef.current = null
+    // Keep transcription as UI feedback only. Backend already processed send_audio.
+    setStatus("Transcripción recibida")
+  }, [clearAudioPlaceholder, setMessages])
+
+  const onNoSpeech = useCallback(() => {
+    clearAudioPlaceholder()
+    setStatus("No se detectó voz")
+  }, [clearAudioPlaceholder])
 
   const { sendMessage, sendAudioMessage, isConnected } = useWebSocketChat({
     conversationId,
@@ -52,6 +74,7 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
     onStatusChange: setStatus,
     onMessagesUpdate: setMessages,
     onTranscriptionResult: onTranscriptionResult,
+    onNoSpeech,
   })
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -86,21 +109,18 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
 
         if (base64Data) {
           console.log("[DEBUG] Enviando mensaje de audio al backend")
+          // Add a placeholder bubble so the user message always appears before the bot response
+          const placeholderId = -Date.now()
+          audioPlaceholderIdRef.current = placeholderId
+          setMessages((prev) => [...prev, { id: placeholderId, role: "user", content: "🎤 Enviando audio..." }])
           sendAudioMessage(base64Data)
-          // Iniciar timeout para cerrar modal si no llega transcripción
-          /*transcriptionTimeoutRef.current = setTimeout(() => {
-            console.log("[DEBUG] Timeout: no llegó transcripción, cerrando modal")
-            setShowVoiceModal(false)
-            setVoiceTranscription("")
-            setStatus("Listo")
-          }, 10000) // 10 segundos*/
         } else {
           console.log("[DEBUG] No se recibió base64Data, no se envía mensaje")
         }
-        // No cerrar el modal aquí, esperar la transcripción
+        // Close modal immediately — no review step
+        setShowVoiceModal(false)
       } else {
         console.log("[DEBUG] Iniciando grabación de voz")
-        setVoiceTranscription("") // Limpiar transcripción anterior
         await startRecording()
         setStatus("Grabando voz...")
         console.log("[DEBUG] Grabación iniciada, mostrando modal")
@@ -112,29 +132,19 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
     }
   }
 
-  const handleSendVoiceMessage = (reviewedText: string) => {
-    console.log("[DEBUG] Enviando mensaje de voz revisado:", reviewedText)
-    if (transcriptionTimeoutRef.current) {
-      clearTimeout(transcriptionTimeoutRef.current)
-      transcriptionTimeoutRef.current = null
-    }
-    setShowVoiceModal(false)
-    setVoiceTranscription("")
-    handleSendMessage(reviewedText)
-  }
-
-  const handleCloseVoiceModal = () => {
+  const handleCloseVoiceModal = async () => {
     if (isRecording) {
-      // Si está grabando, detener primero
-      handleToggleRecording()
+      // Si el usuario cancela mientras graba, detener y descartar audio sin enviarlo
+      try {
+        await stopRecording()
+      } catch (error) {
+        console.error("[DEBUG] Error al cancelar grabación:", error)
+      }
     }
-    if (transcriptionTimeoutRef.current) {
-      clearTimeout(transcriptionTimeoutRef.current)
-      transcriptionTimeoutRef.current = null
-    }
+    // If there's a dangling placeholder (recording cancelled before transcription), remove it
+    clearAudioPlaceholder()
     setShowVoiceModal(false)
-    setVoiceTranscription("")
-    setStatus("Listo")
+    setStatus(isRecording ? "Grabación cancelada" : "Listo")
   }
 
   const resolveAudioUrl = useCallback(
@@ -270,9 +280,7 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
           onToggleRecording={handleToggleRecording}
           isRecording={isRecording}
           audioLevel={audioLevel}
-          transcription={voiceTranscription}
           onClose={handleCloseVoiceModal}
-          onSend={handleSendVoiceMessage}
         />
       </div>
     </div>

@@ -74,7 +74,7 @@ Comportamiento:
           <div className="px-6 py-4 border-b border-stone-200 flex justify-between items-center bg-white">
             <div className="flex flex-col gap-1">
               <h2 className="text-lg font-bold text-stone-900">{character.name}</h2>
-              <p className="text-xs text-stone-500">{character.role}</p>
+              <p className="text-xs text-stone-500">{character.biography}</p>
               <div className="flex items-center gap-2 mt-2">
                 <span className={`w-2 h-2 rounded-full ${status === ConnectionStatus.CONNECTED ? 'bg-green-500 animate-pulse' : 'bg-stone-300'}`}></span>
                 <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">
