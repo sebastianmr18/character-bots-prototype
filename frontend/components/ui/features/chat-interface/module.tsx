@@ -143,9 +143,9 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
 
   // Renderizado
   return (
-    <div className="flex w-full h-full min-h-0">
+    <div className="flex w-full min-h-[calc(100vh-6rem)]">
       <div
-        className="w-full h-full min-h-0 flex flex-col rounded-2xl border border-gray-200 shadow-2xl 
+        className="w-full min-h-0 flex flex-col rounded-2xl border border-gray-200 shadow-2xl 
                    bg-white dark:bg-gray-900 dark:border-gray-700 
                    text-gray-900 dark:text-gray-100 transition-all duration-300 overflow-hidden"
       >

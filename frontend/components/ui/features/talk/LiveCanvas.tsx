@@ -52,8 +52,8 @@ export const LiveCanvas = () => {
 
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 md:p-8 bg-[#fdfaf6]">
-      <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-stone-100 flex flex-col md:flex-row h-[85vh]">
+    <div className="flex flex-col items-center justify-center p-4 md:p-8 bg-[#fdfaf6]">
+      <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-stone-100 flex flex-col md:flex-row min-h-[70vh] md:h-[85vh]">
         
         <Sidebar 
           status={status} 
@@ -101,10 +101,6 @@ export const LiveCanvas = () => {
         </div>
       </div>
 
-      <footer className="mt-8 text-stone-400 text-[10px] text-center max-w-lg leading-relaxed uppercase tracking-widest opacity-80">
-        <p>© 2024 The Andean Pearl Luxury Hotel • Boutique Hospitality • Medellín, Colombia</p>
-        <p className="mt-1">Built with Gemini Live API Architecture</p>
-      </footer>
     </div>
-  );
+  )
 };
