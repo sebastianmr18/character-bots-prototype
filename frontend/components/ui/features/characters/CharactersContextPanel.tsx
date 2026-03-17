@@ -6,6 +6,8 @@ import type { Character, Conversation } from '@/types/chat.types';
 
 interface CharacterContextPanelProps {
     character: Character;
+    onSelectConversation?: (conversationId: string) => void;
+    selectedConversationId?: string;
 }
 
 // TODO: Derivar themeColor y themeColorLight desde los datos del personaje
@@ -13,7 +15,7 @@ interface CharacterContextPanelProps {
 const PLACEHOLDER_THEME_COLOR = 'oklch(0.40 0.10 250)';
 const PLACEHOLDER_THEME_COLOR_LIGHT = 'oklch(0.92 0.03 250)';
 
-export function CharacterContextPanel({ character }: CharacterContextPanelProps) {
+export function CharacterContextPanel({ character, onSelectConversation, selectedConversationId }: CharacterContextPanelProps) {
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [isLoadingConversations, setIsLoadingConversations] = useState(true);
 
@@ -122,16 +124,25 @@ export function CharacterContextPanel({ character }: CharacterContextPanelProps)
                     ) : (
                         <div className="space-y-2">
                             {conversations.map((conv) => (
-                                <div
+                                <button
                                     key={conv.id}
-                                    className="w-full flex items-center gap-3 p-3 rounded-lg bg-muted text-left"
+                                    onClick={() => onSelectConversation?.(conv.id)}
+                                    className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors cursor-pointer ${
+                                        selectedConversationId === conv.id
+                                            ? 'bg-primary text-primary-foreground'
+                                            : 'bg-muted text-foreground hover:bg-muted/80'
+                                    }`}
                                 >
-                                    <MessageSquare className="h-4 w-4 text-muted-foreground shrink-0" />
+                                    <MessageSquare className="h-4 w-4 shrink-0" />
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-foreground truncate">
+                                        <p className="text-sm font-medium truncate">
                                             Conversación
                                         </p>
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className={`text-xs ${
+                                            selectedConversationId === conv.id
+                                                ? 'text-primary-foreground/70'
+                                                : 'text-muted-foreground'
+                                        }`}>
                                             {new Date(conv.createdAt).toLocaleDateString('es-ES', {
                                                 day: 'numeric',
                                                 month: 'short',
@@ -139,7 +150,7 @@ export function CharacterContextPanel({ character }: CharacterContextPanelProps)
                                             })}
                                         </p>
                                     </div>
-                                </div>
+                                </button>
                             ))}
                         </div>
                     )}

@@ -229,7 +229,7 @@ export default function ChatsConversationsPage() {
                   <div className="absolute inset-0 opacity-20">
                     <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
                       <pattern id={`pattern-${character.id}`} patternUnits="userSpaceOnUse" width="20" height="20">
-                        <circle cx="10" cy="10" r="1.5" fill="currentColor" style={{ color: character.themeColor }} />
+                        <circle cx="10" cy="10" r="1.5" fill="currentColor" /*style={{ color: character.themeColor }} *//>
                       </pattern>
                       <rect width="100%" height="100%" fill={`url(#pattern-${character.id})`} />
                     </svg>
