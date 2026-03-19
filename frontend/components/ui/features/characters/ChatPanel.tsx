@@ -2,15 +2,15 @@
 
 import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
 import { VoiceRecordingModal } from "@/components/ui/features/characters/VoiceRecordingModal"
+import { CallModePanel } from "@/components/ui/features/characters/CallModePanel"
 import { useConversation } from "@/hooks/useConversationId"
 import { useWebSocketChat } from "@/hooks/useWebSocket"
 import { useVoiceRecording } from "@/hooks/useVoiceRecording"
 import { useAudioResolver } from "@/hooks/useAudioResolver"
 import { ChatInput } from "@/components/ui/features/characters/ChatInput"
 import { ChatMessages } from "@/components/ui/features/characters/ChatMessages"
-import { MessageSquare, Phone, Mic, Swords, GraduationCap } from "lucide-react"
+import { MessageSquare, Phone, Swords, GraduationCap } from "lucide-react"
 
 type ConversationMode = "chat" | "call" | "interview" | "debate" | "professor"
 
@@ -22,7 +22,6 @@ const MODES: { id: ConversationMode; label: string; icon: React.ElementType }[] 
 ]
 
 const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId }) => {
-  const router = useRouter()
   const [status, setStatus] = useState("Desconectado")
   const [activeMode, setActiveMode] = useState<ConversationMode>("chat")
 
@@ -146,10 +145,6 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
   }
 
   const handleModeClick = (mode: ConversationMode) => {
-    if (mode === "call") {
-      if (selectedCharacterId) router.push(`/call/${selectedCharacterId}`)
-      return
-    }
     setActiveMode(mode)
   }
 
@@ -205,6 +200,8 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
             />
           </div>
         </>
+      ) : activeMode === "call" ? (
+        <CallModePanel characterId={selectedCharacterId} onEndCall={() => setActiveMode("chat")} />
       ) : (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-muted-foreground text-sm">

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai'
 import { Transcription, ConnectionStatus, RAG_TOOLS } from '@/types/live.types'
 import { decode, decodeAudioData, encode } from '@/utils/audio-codec.utils'
@@ -23,6 +23,9 @@ export const useGeminiLive = (systemInstruction: string, characterId: string) =>
 
   const activeSessionRef = useRef<any>(null)
   const sessionPromiseRef = useRef<Promise<any> | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const workletNodeRef = useRef<AudioWorkletNode | null>(null)
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set())
   const nextStartTimeRef = useRef<number>(0)
   const transcriptBufferRef = useRef<{ user: string; model: string }>({ user: '', model: '' })
@@ -39,6 +42,35 @@ export const useGeminiLive = (systemInstruction: string, characterId: string) =>
     sourcesRef.current.clear()
     nextStartTimeRef.current = 0
   }, [])
+
+  const cleanupInputPipeline = useCallback(() => {
+    workletNodeRef.current?.disconnect()
+    workletNodeRef.current = null
+
+    inputSourceRef.current?.disconnect()
+    inputSourceRef.current = null
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+  }, [])
+
+  const cleanupAudioContexts = useCallback(() => {
+    if (inputContextRef.current) {
+      if (inputContextRef.current.state !== 'closed') {
+        void inputContextRef.current.close()
+      }
+      inputContextRef.current = null
+    }
+
+    if (outputContextRef.current) {
+      if (outputContextRef.current.state !== 'closed') {
+        void outputContextRef.current.close()
+      }
+      outputContextRef.current = null
+    }
+  }, [inputContextRef, outputContextRef])
 
   /**
    * Executes a RAG query against the /api/rag/query endpoint.
@@ -84,11 +116,13 @@ export const useGeminiLive = (systemInstruction: string, characterId: string) =>
           void executeRAGQuery(args ?? {}).then((resultText) => {
             try {
               activeSessionRef.current?.sendToolResponse({
-                functionResponses: {
-                  id: toolCallId,
-                  name: functionName,
-                  response: { context: resultText },
-                },
+                functionResponses: [
+                  {
+                    id: toolCallId,
+                    name: functionName,
+                    response: { context: resultText },
+                  },
+                ],
               })
             } catch (error) {
               console.error('[GeminiLive] Error enviando tool response:', error)
@@ -135,14 +169,22 @@ export const useGeminiLive = (systemInstruction: string, characterId: string) =>
     }
   }, [stopAllAudio, executeRAGQuery, outputContextRef])
 
-  const connect = async () => {
+  const connect = useCallback(async () => {
     try {
+      if (
+        status === ConnectionStatus.CONNECTING ||
+        status === ConnectionStatus.CONNECTED
+      ) {
+        return
+      }
+
       setStatus(ConnectionStatus.CONNECTING)
       await initInputAudio()
       await initOutputAudio()
 
       const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_API_KEY || '' })
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
 
       const sessionPromise = ai.live.connect({
         model: MODEL_NAME,
@@ -156,9 +198,17 @@ export const useGeminiLive = (systemInstruction: string, characterId: string) =>
         },
         callbacks: {
           onopen: () => {
+            if (!sessionPromiseRef.current || !inputContextRef.current) {
+              stream.getTracks().forEach((track) => track.stop())
+              return
+            }
+
             setStatus(ConnectionStatus.CONNECTED)
-            const source = inputContextRef.current!.createMediaStreamSource(stream)
-            const workletNode = new AudioWorkletNode(inputContextRef.current!, 'audio-processor')
+            const source = inputContextRef.current.createMediaStreamSource(stream)
+            const workletNode = new AudioWorkletNode(inputContextRef.current, 'audio-processor')
+
+            inputSourceRef.current = source
+            workletNodeRef.current = workletNode
 
             workletNode.port.onmessage = (event: MessageEvent<ArrayBuffer>) => {
               if (isMutedRef.current) return
@@ -170,11 +220,14 @@ export const useGeminiLive = (systemInstruction: string, characterId: string) =>
             }
 
             source.connect(workletNode)
-            workletNode.connect(inputContextRef.current!.destination)
+            workletNode.connect(inputContextRef.current.destination)
           },
           onmessage: handleMessage,
           onerror: () => setStatus(ConnectionStatus.ERROR),
-          onclose: () => setStatus(ConnectionStatus.DISCONNECTED),
+          onclose: () => {
+            setStatus(ConnectionStatus.DISCONNECTED)
+            activeSessionRef.current = null
+          },
         },
       })
 
@@ -185,17 +238,42 @@ export const useGeminiLive = (systemInstruction: string, characterId: string) =>
     } catch {
       setStatus(ConnectionStatus.ERROR)
     }
-  }
+  }, [
+    handleMessage,
+    initInputAudio,
+    initOutputAudio,
+    inputContextRef,
+    status,
+    systemInstruction,
+  ])
 
-  const disconnect = async () => {
-    if (sessionPromiseRef.current) {
-      const session = await sessionPromiseRef.current
-      session.close()
-      sessionPromiseRef.current = null
-    }
+  const disconnect = useCallback(async () => {
+    const pendingSession = sessionPromiseRef.current
+    sessionPromiseRef.current = null
+
     stopAllAudio()
+    cleanupInputPipeline()
+    cleanupAudioContexts()
+
+    if (pendingSession) {
+      try {
+        const session = await pendingSession
+        session.close()
+      } catch {
+        // Ignore close errors during teardown.
+      }
+    }
+
+    activeSessionRef.current = null
+    transcriptBufferRef.current = { user: '', model: '' }
     setStatus(ConnectionStatus.DISCONNECTED)
-  }
+  }, [cleanupAudioContexts, cleanupInputPipeline, stopAllAudio])
+
+  useEffect(() => {
+    return () => {
+      void disconnect()
+    }
+  }, [disconnect])
 
   return {
     status,
