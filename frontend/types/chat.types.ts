@@ -46,6 +46,11 @@ export interface Character {
   biography: string
   voiceId?: string | null
   vectorDbName?: string | null
+  themeColor?: string | null
+  themeColorLight?: string | null
+  years?: string | null
+  category?: string | null
+  topics?: string[] | null
 }
 
 export interface Conversation {

@@ -17,7 +17,7 @@ import { CreateCharacterModal } from '@/components/ui/features/character-menu/Cr
 import type { Character, Conversation } from '@/types/chat.types'
 import { getErrorMessage } from '@/utils/api.utils'
 import { ArrowLeft, Sparkles, MessageSquare } from 'lucide-react'
-import { toSlug } from '@/utils/character.utils'
+import { toSlug, colorFromName, lightColorFromName } from '@/utils/character.utils'
 
 // Se define el tipo para la estructura de agrupación
 type GroupedChats = {
@@ -62,7 +62,6 @@ export default function ChatsConversationsPage() {
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null)
   const [operationError, setOperationError] = useState<string | null>(null)
   const [groupedChats, setGroupedChats] = useState<GroupedChats>({})
-  const [isHovered, setIsHovered] = useState(false);
 
   const fetchAllData = useCallback(async () => {
     try {
@@ -216,20 +215,17 @@ export default function ChatsConversationsPage() {
                 key={character.id}
                 className="group relative rounded-lg overflow-hidden bg-card border border-border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
                 onClick={() => handleCharacterClick(character.name)}
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
-              // TODO: Cada personaje debe tener una paleta de colores personalizada para mejorar la UI, por ahora se usan colores neutros
-              //style={{
-              //  '--character-color': character.themeColor,
-              //  '--character-color-light': character.themeColorLight,
-              //} as React.CSSProperties}
+                style={{
+                  '--character-color': character.themeColor ?? colorFromName(character.name),
+                  '--character-color-light': character.themeColorLight ?? lightColorFromName(character.name),
+                } as React.CSSProperties}
               >
                 {/* Título del Personaje y Botón de Nuevo Chat */}
                 <div className="h-40 relative overflow-hidden">
                   <div className="absolute inset-0 opacity-20">
                     <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
                       <pattern id={`pattern-${character.id}`} patternUnits="userSpaceOnUse" width="20" height="20">
-                        <circle cx="10" cy="10" r="1.5" fill="currentColor" /*style={{ color: character.themeColor }} *//>
+                        <circle cx="10" cy="10" r="1.5" fill={character.themeColor ?? colorFromName(character.name)} />
                       </pattern>
                       <rect width="100%" height="100%" fill={`url(#pattern-${character.id})`} />
                     </svg>
@@ -239,7 +235,7 @@ export default function ChatsConversationsPage() {
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span
                       className="text-6xl font-serif font-bold opacity-30"
-                    //style={{ color: character.themeColor }}
+                      style={{ color: character.themeColor ?? colorFromName(character.name) }}
                     >
                       {character.name[0]}
                     </span>
@@ -251,7 +247,10 @@ export default function ChatsConversationsPage() {
                   </h3>
                   <div className="flex gap-2 text-sm text-muted-foreground">
                     <span className="px-2 py-0.5 rounded-full text-xs"
-                    //style={{ backgroundColor: character.themeColorLight, color: character.themeColor }}
+                      style={{
+                        backgroundColor: character.themeColorLight ?? lightColorFromName(character.name),
+                        color: character.themeColor ?? colorFromName(character.name),
+                      }}
                     >
                       {character.role}
                     </span>

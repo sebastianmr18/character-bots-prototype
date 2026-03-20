@@ -20,16 +20,18 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
   }, [])
 
   return (
-    <main className="min-h-screen bg-background">
-      <button
-        onClick={() => router.push('/personajes')}
-        className="absolute top-20 left-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors z-10"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Volver a personajes
-      </button>
+    <main className="min-h-screen bg-background flex flex-col">
+      <nav className="px-4 py-3 border-b border-border shrink-0">
+        <button
+          onClick={() => router.push('/personajes')}
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Volver a personajes
+        </button>
+      </nav>
 
-      <div className="flex flex-col lg:flex-row min-h-[calc(100vh-4rem)]">
+      <div className="flex flex-col lg:flex-row flex-1">
         {/* Left Panel - Character Context (60%) */}
         <div className="lg:w-[60%] border-r border-border overflow-hidden flex flex-col">
           <CharacterContextPanel
