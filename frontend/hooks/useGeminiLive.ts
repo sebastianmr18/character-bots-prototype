@@ -1,154 +1,191 @@
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useRef, useCallback } from 'react';
-import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
-import { Transcription, ConnectionStatus } from '@/types/live.types';
-import { decode, decodeAudioData, createBlobFromFloat32 } from '@/utils/live-audio.utils';
-import { RAG_TOOLS } from '@/types/live.types';
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai'
+import { Transcription, ConnectionStatus, RAG_TOOLS } from '@/types/live.types'
+import { decode, decodeAudioData, encode } from '@/utils/audio-codec.utils'
+import { useAudioContext } from '@/hooks/useAudioContext'
 
-const MODEL_NAME = 'gemini-2.5-flash-native-audio-preview-12-2025';
+const MODEL_NAME = 'gemini-2.5-flash-native-audio-preview-12-2025'
 
 export const useGeminiLive = (systemInstruction: string, characterId: string) => {
-  const [status, setStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED);
-  const [history, setHistory] = useState<Transcription[]>([]);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isSearching, setIsSearching] = useState(false); // Nuevo estado
-  
-  const activeSessionRef = useRef<any>(null); 
-  const sessionPromiseRef = useRef<Promise<any> | null>(null);
-  const audioContextsRef = useRef<{ input: AudioContext; output: AudioContext } | null>(null);
-  const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
-  const nextStartTimeRef = useRef<number>(0);
-  const transcriptBufferRef = useRef<{ user: string; model: string }>({ user: '', model: '' });
+  const [status, setStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED)
+  const [history, setHistory] = useState<Transcription[]>([])
+  const [isMuted, setIsMuted] = useState(false)
+  const isMutedRef = useRef(false)
+  const [isSearching, setIsSearching] = useState(false)
 
-  const initAudio = async () => {
-    if (!audioContextsRef.current) {
-      audioContextsRef.current = {
-        input: new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 }),
-        output: new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 }),
-      };
-    }
-    if (audioContextsRef.current.input.state === 'suspended') await audioContextsRef.current.input.resume();
-    if (audioContextsRef.current.output.state === 'suspended') await audioContextsRef.current.output.resume();
-  };
+  // Separate input (capture, 16 kHz + worklet) and output (playback, 24 kHz) contexts
+  const { contextRef: inputContextRef, init: initInputAudio } = useAudioContext(
+    16000,
+    '/worklets/audio-processor.js',
+  )
+  const { contextRef: outputContextRef, init: initOutputAudio } = useAudioContext(24000)
+
+  const activeSessionRef = useRef<any>(null)
+  const sessionPromiseRef = useRef<Promise<any> | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const workletNodeRef = useRef<AudioWorkletNode | null>(null)
+  const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set())
+  const nextStartTimeRef = useRef<number>(0)
+  const transcriptBufferRef = useRef<{ user: string; model: string }>({ user: '', model: '' })
+
+  const handleSetIsMuted = useCallback((value: boolean) => {
+    isMutedRef.current = value
+    setIsMuted(value)
+  }, [])
 
   const stopAllAudio = useCallback(() => {
-    sourcesRef.current.forEach(source => {
-      try { source.stop(); } catch(e) {}
-    });
-    sourcesRef.current.clear();
-    nextStartTimeRef.current = 0;
-  }, []);
+    sourcesRef.current.forEach((source) => {
+      try { source.stop() } catch { /* already stopped */ }
+    })
+    sourcesRef.current.clear()
+    nextStartTimeRef.current = 0
+  }, [])
 
-  // Funcion auxiliar para ejecutar la busqueda RAG
-const executeRAGQuery = async (functionName: string, args: any): Promise<string> => {
-  if (functionName === 'consultar_informacion_SHELDON') {
-    console.log("%c🔍 RAG: Iniciando consulta...", "color: #d4af37; font-weight: bold;", args.query);
-    setIsSearching(true);
-    
+  const cleanupInputPipeline = useCallback(() => {
+    workletNodeRef.current?.disconnect()
+    workletNodeRef.current = null
+
+    inputSourceRef.current?.disconnect()
+    inputSourceRef.current = null
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+  }, [])
+
+  const cleanupAudioContexts = useCallback(() => {
+    if (inputContextRef.current) {
+      if (inputContextRef.current.state !== 'closed') {
+        void inputContextRef.current.close()
+      }
+      inputContextRef.current = null
+    }
+
+    if (outputContextRef.current) {
+      if (outputContextRef.current.state !== 'closed') {
+        void outputContextRef.current.close()
+      }
+      outputContextRef.current = null
+    }
+  }, [inputContextRef, outputContextRef])
+
+  /**
+   * Executes a RAG query against the /api/rag/query endpoint.
+   * Works with any function name declared in RAG_TOOLS — no name check needed.
+   */
+  const executeRAGQuery = useCallback(async (args: any): Promise<string> => {
+    if (!args.query) return 'Error: el argumento query es requerido.'
+    setIsSearching(true)
     try {
       const response = await fetch('/api/rag/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: args.query, characterId: characterId })
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Error en la consulta RAG');
-      }
-      
-      console.log("%c✅ RAG: Datos recuperados", "color: #2ecc71; font-weight: bold;", {
-        query: args.query,
-        contextLength: data.context?.length || 0
-      });
-      
-      return data.context || 'No se encontró información relevante en la base de conocimientos.';
+        body: JSON.stringify({ query: args.query, characterId }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Error en la consulta RAG')
+      return data.context || 'No se encontró información relevante en la base de conocimientos.'
     } catch (error) {
-      console.error("%c❌ RAG: Error en la consulta", "color: #e74c3c; font-weight: bold;", error);
-      return 'Lo siento, no pude acceder a la base de conocimientos en este momento.';
+      console.error('[GeminiLive] RAG query error:', error)
+      return 'Lo siento, no pude acceder a la base de conocimientos en este momento.'
     } finally {
-      setIsSearching(false);
+      setIsSearching(false)
     }
-  }
-  return `Function ${functionName} not implemented.`;
-};
+  }, [characterId])
 
   const handleMessage = useCallback(async (message: LiveServerMessage) => {
-// 1. Manejo de Interrupciones
+    // 1. Interrupciones
     if (message.serverContent?.interrupted) {
-      stopAllAudio();
-      return;
+      stopAllAudio()
+      return
     }
 
-    // 2. Manejo de Llamadas a Herramientas (Tool Call)
-    /*
-if (message.toolCall) {
-  const functionCalls = message.toolCall.functionCalls;
-  if (functionCalls && functionCalls.length > 0) {
-    const functionCall = functionCalls[0];
-    const { name, args, id } = functionCall;
-    const functionName = typeof name === 'string' ? name : '';
-    const toolCallId = typeof id === 'string' ? id : '';
+    // 2. Tool calls (RAG)
+    if (message.toolCall) {
+      const functionCalls = message.toolCall.functionCalls
+      if (functionCalls && functionCalls.length > 0) {
+        functionCalls.forEach((functionCall) => {
+          const { name, args, id } = functionCall
+          const functionName = typeof name === 'string' ? name : ''
+          const toolCallId = typeof id === 'string' ? id : ''
+          if (!functionName || !toolCallId || !activeSessionRef.current) return
 
-    if (functionName && toolCallId && activeSessionRef.current) {
-      // Ejecutar RAG (asíncrono, no bloquear)
-      executeRAGQuery(functionName, args ?? {}).then(resultText => {
-        activeSessionRef.current?.sendToolResponse({
-          id: toolCallId,
-          response: JSON.stringify({
-            context: resultText
+          void executeRAGQuery(args ?? {}).then((resultText) => {
+            try {
+              activeSessionRef.current?.sendToolResponse({
+                functionResponses: [
+                  {
+                    id: toolCallId,
+                    name: functionName,
+                    response: { context: resultText },
+                  },
+                ],
+              })
+            } catch (error) {
+              console.error('[GeminiLive] Error enviando tool response:', error)
+            }
           })
-        });
-      });
-    }
-  }
-  return;
-}
-*/
-    // 3. Manejo de Audio (Igual que antes)
-    const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-    if (base64Audio && audioContextsRef.current) {
-      const { output } = audioContextsRef.current;
-      nextStartTimeRef.current = Math.max(nextStartTimeRef.current, output.currentTime);
-      const audioBuffer = await decodeAudioData(decode(base64Audio), output, 24000, 1);
-      const source = output.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(output.destination);
-      source.addEventListener('ended', () => sourcesRef.current.delete(source));
-      source.start(nextStartTimeRef.current);
-      nextStartTimeRef.current += audioBuffer.duration;
-      sourcesRef.current.add(source);
+        })
+      }
+      return
     }
 
+    // 3. Audio playback
+    const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data
+    if (base64Audio && outputContextRef.current) {
+      const output = outputContextRef.current
+      nextStartTimeRef.current = Math.max(nextStartTimeRef.current, output.currentTime)
+      const audioBuffer = await decodeAudioData(decode(base64Audio), output, 24000, 1)
+      const source = output.createBufferSource()
+      source.buffer = audioBuffer
+      source.connect(output.destination)
+      source.addEventListener('ended', () => sourcesRef.current.delete(source))
+      source.start(nextStartTimeRef.current)
+      nextStartTimeRef.current += audioBuffer.duration
+      sourcesRef.current.add(source)
+    }
+
+    // 4. Transcriptions
     if (message.serverContent?.inputTranscription) {
-      transcriptBufferRef.current.user += message.serverContent.inputTranscription.text;
+      transcriptBufferRef.current.user += message.serverContent.inputTranscription.text
     }
     if (message.serverContent?.outputTranscription) {
-      transcriptBufferRef.current.model += message.serverContent.outputTranscription.text;
+      transcriptBufferRef.current.model += message.serverContent.outputTranscription.text
     }
 
+    // 5. Turn complete — flush transcript buffer
     if (message.serverContent?.turnComplete) {
-      const userText = transcriptBufferRef.current.user;
-      const modelText = transcriptBufferRef.current.model;
-      setHistory(prev => {
-        const newHistory = [...prev];
-        if (userText) newHistory.push({ role: 'user', text: userText, timestamp: new Date() });
-        if (modelText) newHistory.push({ role: 'model', text: modelText, timestamp: new Date() });
-        return newHistory.slice(-20);
-      });
-      transcriptBufferRef.current = { user: '', model: '' };
+      const { user: userText, model: modelText } = transcriptBufferRef.current
+      setHistory((prev) => {
+        const next = [...prev]
+        if (userText) next.push({ role: 'user', text: userText, timestamp: new Date() })
+        if (modelText) next.push({ role: 'model', text: modelText, timestamp: new Date() })
+        return next.slice(-20)
+      })
+      transcriptBufferRef.current = { user: '', model: '' }
     }
-  }, [stopAllAudio]);
+  }, [stopAllAudio, executeRAGQuery, outputContextRef])
 
-  const connect = async () => {
+  const connect = useCallback(async () => {
     try {
-      setStatus(ConnectionStatus.CONNECTING);
-      await initAudio();
-      const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_API_KEY || '' });
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
+      if (
+        status === ConnectionStatus.CONNECTING ||
+        status === ConnectionStatus.CONNECTED
+      ) {
+        return
+      }
+
+      setStatus(ConnectionStatus.CONNECTING)
+      await initInputAudio()
+      await initOutputAudio()
+
+      const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_API_KEY || '' })
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+
       const sessionPromise = ai.live.connect({
         model: MODEL_NAME,
         config: {
@@ -161,42 +198,90 @@ if (message.toolCall) {
         },
         callbacks: {
           onopen: () => {
-            setStatus(ConnectionStatus.CONNECTED);
-            const source = audioContextsRef.current!.input.createMediaStreamSource(stream);
-            const scriptProcessor = audioContextsRef.current!.input.createScriptProcessor(4096, 1, 1);
-            scriptProcessor.onaudioprocess = (e) => {
-              if (isMuted) return;
-              const inputData = e.inputBuffer.getChannelData(0);
-              const pcmBlob = createBlobFromFloat32(inputData);
-              sessionPromise.then((session) => session.sendRealtimeInput({ media: pcmBlob }));
-            };
-            source.connect(scriptProcessor);
-            scriptProcessor.connect(audioContextsRef.current!.input.destination);
+            if (!sessionPromiseRef.current || !inputContextRef.current) {
+              stream.getTracks().forEach((track) => track.stop())
+              return
+            }
+
+            setStatus(ConnectionStatus.CONNECTED)
+            const source = inputContextRef.current.createMediaStreamSource(stream)
+            const workletNode = new AudioWorkletNode(inputContextRef.current, 'audio-processor')
+
+            inputSourceRef.current = source
+            workletNodeRef.current = workletNode
+
+            workletNode.port.onmessage = (event: MessageEvent<ArrayBuffer>) => {
+              if (isMutedRef.current) return
+              const pcmBlob = {
+                data: encode(new Uint8Array(event.data)),
+                mimeType: 'audio/pcm;rate=16000',
+              }
+              sessionPromise.then((session) => session.sendRealtimeInput({ media: pcmBlob }))
+            }
+
+            source.connect(workletNode)
+            workletNode.connect(inputContextRef.current.destination)
           },
           onmessage: handleMessage,
           onerror: () => setStatus(ConnectionStatus.ERROR),
-          onclose: () => setStatus(ConnectionStatus.DISCONNECTED),
+          onclose: () => {
+            setStatus(ConnectionStatus.DISCONNECTED)
+            activeSessionRef.current = null
+          },
         },
-      });
-      sessionPromiseRef.current = sessionPromise;
-      // Guardamos la referencia sincrona cuando se resuelva para usarla en tools y audio
-      sessionPromise.then(session => {
-          activeSessionRef.current = session;
-      });
-    } catch (err) {
-      setStatus(ConnectionStatus.ERROR);
-    }
-  };
+      })
 
-  const disconnect = async () => {
-    if (sessionPromiseRef.current) {
-      const session = await sessionPromiseRef.current;
-      session.close();
-      sessionPromiseRef.current = null;
+      sessionPromiseRef.current = sessionPromise
+      sessionPromise.then((session) => {
+        activeSessionRef.current = session
+      })
+    } catch {
+      setStatus(ConnectionStatus.ERROR)
     }
-    stopAllAudio();
-    setStatus(ConnectionStatus.DISCONNECTED);
-  };
+  }, [
+    handleMessage,
+    initInputAudio,
+    initOutputAudio,
+    inputContextRef,
+    status,
+    systemInstruction,
+  ])
 
-  return { status, history, isMuted, setIsMuted, connect, disconnect, isSearching };
-};
+  const disconnect = useCallback(async () => {
+    const pendingSession = sessionPromiseRef.current
+    sessionPromiseRef.current = null
+
+    stopAllAudio()
+    cleanupInputPipeline()
+    cleanupAudioContexts()
+
+    if (pendingSession) {
+      try {
+        const session = await pendingSession
+        session.close()
+      } catch {
+        // Ignore close errors during teardown.
+      }
+    }
+
+    activeSessionRef.current = null
+    transcriptBufferRef.current = { user: '', model: '' }
+    setStatus(ConnectionStatus.DISCONNECTED)
+  }, [cleanupAudioContexts, cleanupInputPipeline, stopAllAudio])
+
+  useEffect(() => {
+    return () => {
+      void disconnect()
+    }
+  }, [disconnect])
+
+  return {
+    status,
+    history,
+    isMuted,
+    setIsMuted: handleSetIsMuted,
+    connect,
+    disconnect,
+    isSearching,
+  }
+}

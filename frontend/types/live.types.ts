@@ -20,7 +20,7 @@ export const RAG_TOOLS: Tool[] = [
     functionDeclarations: [
       {
         name: "consultar_informacion_SHELDON",
-        description: "Consulta la base de conocimientos de Sheldon (anécdotas, física, contratos, etc.)",
+        description: "Consulta la base de conocimientos",
         parameters: {
           type: Type.OBJECT,
           properties: {

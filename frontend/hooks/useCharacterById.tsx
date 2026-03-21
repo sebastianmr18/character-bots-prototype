@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import type { Character } from "@/types/chat.types"
+import { normalizeBackendCharacter } from "@/utils/message.utils"
 
 export const useCharacterById = (characterId: string | null) => {
     const [character, setCharacter] = useState<Character | null>(null)
@@ -26,7 +27,7 @@ export const useCharacterById = (characterId: string | null) => {
                 }
 
                 const data: Character = await response.json()
-                setCharacter(data)
+                setCharacter(normalizeBackendCharacter(data))
 
             } catch (err) {
                 console.error("Error al cargar el personaje:", err)

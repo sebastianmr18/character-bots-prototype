@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import type { Message, Character } from "@/types/chat.types"
-import { normalizeBackendMessages } from "@/utils/message.utils"
+import { normalizeBackendCharacter, normalizeBackendMessages } from "@/utils/message.utils"
 
 interface CharacterReference {
     id: string;
@@ -43,9 +43,7 @@ export const useConversation = (initialConversationId: string) => {
                     messages: Message[] 
                 } = await response.json()
                 
-                console.log("Conversación cargada:", data)
-                
-                setSelectedCharacter(data.character)
+                setSelectedCharacter(normalizeBackendCharacter(data.character))
                 setMessages(normalizeBackendMessages(data.messages || []))
 
             } catch (error) {
@@ -67,6 +65,8 @@ export const useConversation = (initialConversationId: string) => {
         setMessages, 
         selectedCharacterId: selectedCharacter?.id || null,
         characterName: selectedCharacter?.name || "Cargando...",
+        characterBiography: selectedCharacter?.biography || "Biografia no disponible.",
+        characterDataset: selectedCharacter?.vectorDbName ? `Este personaje usa el dataset ${selectedCharacter.vectorDbName}` : "Dataset no disponible.",
         availableCharacters,
         isLoading
     }

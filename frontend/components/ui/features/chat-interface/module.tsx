@@ -4,16 +4,17 @@ import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "@/app/providers"
-import { VoiceRecordingModal } from "./VoiceRecordingModal";
+import { VoiceRecordingModal } from "@/components/ui/features/chat-interface/VoiceRecordingModal";
 import { useConversation } from "@/hooks/useConversationId";
 import { useWebSocketChat } from "@/hooks/useWebSocket";
 import { useVoiceRecording } from "@/hooks/useVoiceRecording";
+import { useAudioResolver } from "@/hooks/useAudioResolver";
 import { StatusIndicator } from "@/components/ui/features/chat-interface/StatusIndicator";
 import { ChatInput } from "@/components/ui/features/chat-interface/ChatInput";
 import { ChatMessages } from "@/components/ui/features/chat-interface/ChatMessages";
 import { Button } from "@/components/ui/button"
-import { Moon, Sun, Phone } from 'lucide-react'
-import { normalizeBackendMessages } from "@/utils/message.utils"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { Moon, Sun, Phone, CircleHelp } from 'lucide-react'
 
 const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId }) => {
   const router = useRouter()
@@ -25,23 +26,46 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
     setMessages, 
     selectedCharacterId, 
     availableCharacters,
-    characterName
+    characterName,
+    characterBiography,
+    characterDataset,
   } = useConversation(conversationId)
 
   const [showVoiceModal, setShowVoiceModal] = useState(false)
-  const [voiceTranscription, setVoiceTranscription] = useState("")
-  const transcriptionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const audioPlaceholderIdRef = useRef<number | null>(null)
+
+  const clearAudioPlaceholder = useCallback(() => {
+    if (audioPlaceholderIdRef.current === null) return
+
+    const placeholderId = audioPlaceholderIdRef.current
+    setMessages((prev) => prev.filter((msg) => String(msg.id) !== String(placeholderId)))
+    audioPlaceholderIdRef.current = null
+  }, [setMessages])
 
   const onTranscriptionResult = useCallback((text: string) => {
-    console.log("[DEBUG] Transcripción recibida del backend:", text)
-    if (transcriptionTimeoutRef.current) {
-      clearTimeout(transcriptionTimeoutRef.current)
-      transcriptionTimeoutRef.current = null
+    if (!text.trim()) {
+      clearAudioPlaceholder()
+      setStatus("Sin transcripción")
+      return
     }
-    setVoiceTranscription(text)
-    setShowVoiceModal(true)
-    setStatus("Transcripción recibida. Revisa.")
-  }, [])
+
+    // Replace the placeholder bubble with the real transcription text
+    setMessages((prev) =>
+      prev.map((msg) =>
+        audioPlaceholderIdRef.current !== null && String(msg.id) === String(audioPlaceholderIdRef.current)
+          ? { ...msg, content: text }
+          : msg
+      )
+    )
+    audioPlaceholderIdRef.current = null
+    // Keep transcription as UI feedback only. Backend already processed send_audio.
+    setStatus("Transcripción recibida")
+  }, [clearAudioPlaceholder, setMessages])
+
+  const onNoSpeech = useCallback(() => {
+    clearAudioPlaceholder()
+    setStatus("No se detectó voz")
+  }, [clearAudioPlaceholder])
 
   const { sendMessage, sendAudioMessage, isConnected } = useWebSocketChat({
     conversationId,
@@ -49,19 +73,20 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
     onStatusChange: setStatus,
     onMessagesUpdate: setMessages,
     onTranscriptionResult: onTranscriptionResult,
+    onNoSpeech,
   })
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const { isRecording, audioLevel, startRecording, stopRecording } = useVoiceRecording()
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+  }, [])
 
   useEffect(() => {
     scrollToBottom()
-  }, [messages])
+  }, [messages, scrollToBottom])
 
   const handleSendMessage = (text: string) => {
     if (!text.trim()) return
@@ -76,118 +101,75 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
   const handleToggleRecording = async () => {
     try {
       if (isRecording) {
-        console.log("[DEBUG] Deteniendo grabación de voz")
         setStatus("Esperando transcripción...")
         const base64Data = await stopRecording()
-        console.log("[DEBUG] Grabación detenida, base64Data recibido:", base64Data ? "Sí" : "No", base64Data ? `(${base64Data.length} chars)` : "")
 
         if (base64Data) {
-          console.log("[DEBUG] Enviando mensaje de audio al backend")
+          // Add a placeholder bubble so the user message always appears before the bot response
+          const placeholderId = -Date.now()
+          audioPlaceholderIdRef.current = placeholderId
+          setMessages((prev) => [...prev, { id: placeholderId, role: "user", content: "🎤 Enviando audio..." }])
           sendAudioMessage(base64Data)
-          // Iniciar timeout para cerrar modal si no llega transcripción
-          /*transcriptionTimeoutRef.current = setTimeout(() => {
-            console.log("[DEBUG] Timeout: no llegó transcripción, cerrando modal")
-            setShowVoiceModal(false)
-            setVoiceTranscription("")
-            setStatus("Listo")
-          }, 10000) // 10 segundos*/
-        } else {
-          console.log("[DEBUG] No se recibió base64Data, no se envía mensaje")
         }
-        // No cerrar el modal aquí, esperar la transcripción
+        // Close modal immediately — no review step
+        setShowVoiceModal(false)
       } else {
-        console.log("[DEBUG] Iniciando grabación de voz")
-        setVoiceTranscription("") // Limpiar transcripción anterior
         await startRecording()
         setStatus("Grabando voz...")
-        console.log("[DEBUG] Grabación iniciada, mostrando modal")
         setShowVoiceModal(true)
       }
     } catch (error) {
-      console.error("[DEBUG] Error en handleToggleRecording:", error)
+      console.error("Error en handleToggleRecording:", error)
       setStatus("Error en grabación")
     }
   }
 
-  const handleSendVoiceMessage = (reviewedText: string) => {
-    console.log("[DEBUG] Enviando mensaje de voz revisado:", reviewedText)
-    if (transcriptionTimeoutRef.current) {
-      clearTimeout(transcriptionTimeoutRef.current)
-      transcriptionTimeoutRef.current = null
-    }
-    setShowVoiceModal(false)
-    setVoiceTranscription("")
-    handleSendMessage(reviewedText)
-  }
-
-  const handleCloseVoiceModal = () => {
+  const handleCloseVoiceModal = async () => {
     if (isRecording) {
-      // Si está grabando, detener primero
-      handleToggleRecording()
+      // Si el usuario cancela mientras graba, detener y descartar audio sin enviarlo
+      try {
+        await stopRecording()
+      } catch (error) {
+        console.error("Error al cancelar grabación:", error)
+      }
     }
-    if (transcriptionTimeoutRef.current) {
-      clearTimeout(transcriptionTimeoutRef.current)
-      transcriptionTimeoutRef.current = null
-    }
+    // If there's a dangling placeholder (recording cancelled before transcription), remove it
+    clearAudioPlaceholder()
     setShowVoiceModal(false)
-    setVoiceTranscription("")
-    setStatus("Listo")
+    setStatus(isRecording ? "Grabación cancelada" : "Listo")
   }
 
-  const resolveAudioUrl = useCallback(
-    async (messageId: number | string, forceRefresh = false) => {
-      if (!conversationId) {
-        return { audioUrl: null, mediaType: null }
-      }
-
-      if (!forceRefresh) {
-        const localMessage = messages.find((message) => String(message.id) === String(messageId))
-        if (localMessage?.audioUrl) {
-          return {
-            audioUrl: localMessage.audioUrl,
-            mediaType: localMessage.mediaType ?? null,
-          }
-        }
-      }
-
-      const response = await fetch(`/api/conversations/${conversationId}`, { cache: "no-store" })
-      if (!response.ok) {
-        return { audioUrl: null, mediaType: null }
-      }
-
-      const data = await response.json()
-      const normalizedMessages = normalizeBackendMessages(data.messages || [])
-
-      setMessages((prev) => {
-        const updatesById = new Map(normalizedMessages.map((message) => [String(message.id), message]))
-        return prev.map((message) => {
-          const updated = updatesById.get(String(message.id))
-          return updated ? { ...message, ...updated } : message
-        })
-      })
-
-      const refreshedMessage = normalizedMessages.find((message) => String(message.id) === String(messageId))
-      return {
-        audioUrl: refreshedMessage?.audioUrl ?? null,
-        mediaType: refreshedMessage?.mediaType ?? null,
-      }
-    },
-    [conversationId, messages, setMessages]
-  )
+  const resolveAudioUrl = useAudioResolver(conversationId, messages, setMessages)
 
   // Renderizado
   return (
-    <div className="flex w-full min-h-screen">
+    <div className="flex w-full min-h-[calc(100vh-6rem)]">
       <div
-        className="w-full min-h-screen flex flex-col rounded-2xl border border-gray-200 shadow-2xl 
+        className="w-full min-h-0 flex flex-col rounded-2xl border border-gray-200 shadow-2xl 
                    bg-white dark:bg-gray-900 dark:border-gray-700 
                    text-gray-900 dark:text-gray-100 transition-all duration-300 overflow-hidden"
       >
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 p-6 text-white">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold mb-1">Habla con {characterName || "el personaje"}</h1>
-              <p className="text-sm text-blue-100">Prototipo con RAG y ElevenLabs</p>
+              <h1 className="text-2xl font-bold mb-1 flex items-center gap-2">
+                <span>Habla con {characterName || "el personaje"}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-center rounded-full text-blue-100 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                      aria-label="Ver biografia del personaje"
+                    >
+                      <CircleHelp className="w-4 h-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={8} className="max-w-xs text-xs leading-relaxed">
+                    {characterDataset}
+                  </TooltipContent>
+                </Tooltip>
+              </h1>
+              <p className="text-sm text-blue-100">{characterBiography}</p>
             </div>
 
             <div className="flex items-center gap-2">
@@ -219,7 +201,7 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50 dark:bg-gray-800/50">
+        <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4 bg-gray-50 dark:bg-gray-800/50">
           <ChatMessages
             messages={messages}
             availableCharacters={availableCharacters} // Suministrado por useConversation
@@ -251,9 +233,7 @@ const ChatInterface: React.FC<{ conversationId: string }> = ({ conversationId })
           onToggleRecording={handleToggleRecording}
           isRecording={isRecording}
           audioLevel={audioLevel}
-          transcription={voiceTranscription}
           onClose={handleCloseVoiceModal}
-          onSend={handleSendVoiceMessage}
         />
       </div>
     </div>

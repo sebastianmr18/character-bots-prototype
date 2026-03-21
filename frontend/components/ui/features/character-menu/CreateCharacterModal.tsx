@@ -1,6 +1,5 @@
 'use client'
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react'
 import { PlusCircle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -17,53 +16,107 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 
 interface CreateCharacterModalProps {
-  onCharacterCreated: () => void; // Función para actualizar la lista después de la creación
+  onCharacterCreated: () => void
 }
 
-export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({ onCharacterCreated }) => {
+interface CharacterFormData {
+  name: string
+  role: string
+  biography: string
+  keyTraits: string
+  speechTics: string
+  vectorDbName: string
+  voiceId: string
+  isPublic: boolean
+}
+
+interface CharacterCreatePayload {
+  name: string
+  role: string
+  biography: string
+  keyTraits: string[]
+  speechTics: string[]
+  vectorDbName?: string
+  voiceId?: string
+  isPublic?: boolean
+}
+
+const INITIAL_FORM: CharacterFormData = {
+  name: '',
+  role: '',
+  biography: '',
+  keyTraits: '',
+  speechTics: '',
+  vectorDbName: '',
+  voiceId: '',
+  isPublic: false,
+}
+
+const parseCommaList = (value: string) =>
+  value.split(',').map((item) => item.trim()).filter(Boolean)
+
+const validateForm = (form: CharacterFormData): string | null => {
+  if (!form.name.trim() || !form.role.trim() || !form.biography.trim()) {
+    return 'El Nombre, Rol y Biografía son obligatorios.'
+  }
+  return null
+}
+
+const buildPayload = (
+  form: CharacterFormData,
+  showAdvanced: boolean,
+): CharacterCreatePayload => {
+  const payload: CharacterCreatePayload = {
+    name: form.name,
+    role: form.role,
+    biography: form.biography,
+    keyTraits: parseCommaList(form.keyTraits),
+    speechTics: parseCommaList(form.speechTics),
+  }
+
+  if (showAdvanced) {
+    if (form.vectorDbName.trim()) payload.vectorDbName = form.vectorDbName.trim()
+    if (form.voiceId.trim()) payload.voiceId = form.voiceId.trim()
+    payload.isPublic = form.isPublic
+  }
+
+  return payload
+}
+
+export const CreateCharacterModal = ({ onCharacterCreated }: CreateCharacterModalProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-
-  // Campos principales
-  const [name, setName] = useState('')
-  const [role, setRole] = useState('')
-  const [biography, setBiography] = useState('')
-  const [keyTraits, setKeyTraits] = useState('')
-  const [speechTics, setSpeechTics] = useState('')
-
-  // Opciones avanzadas
+  const [form, setForm] = useState<CharacterFormData>(INITIAL_FORM)
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const [vectorDbName, setVectorDbName] = useState('')
-  const [voiceId, setVoiceId] = useState('')
-  const [isPublic, setIsPublic] = useState(false)
 
-  const isFormValid = name.trim() && role.trim() && biography.trim();
+  const isFormValid =
+    form.name.trim().length > 0 &&
+    form.role.trim().length > 0 &&
+    form.biography.trim().length > 0
+
+  const setField = <K extends keyof CharacterFormData>(
+    key: K,
+    value: CharacterFormData[K],
+  ) => {
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const resetForm = () => {
+    setForm(INITIAL_FORM)
+    setShowAdvanced(false)
+  }
 
   const handleCreate = async () => {
     setErrorMsg(null)
-    if (!isFormValid) {
-      setErrorMsg('El Nombre, Rol y Biografía son obligatorios.')
+
+    const validationError = validateForm(form)
+    if (validationError) {
+      setErrorMsg(validationError)
       return
     }
 
-    // Transformar los campos de texto separados por comas a arrays
-    const traitsArray = keyTraits.split(',').map(t => t.trim()).filter(t => t.length > 0)
-    const ticsArray = speechTics.split(',').map(t => t.trim()).filter(t => t.length > 0)
-
-    // Construir payload según API
-    const characterData: Record<string, any> = {
-      name,
-      role,
-      biography,
-      keyTraits: traitsArray,
-      speechTics: ticsArray,
-    }
-    if (showAdvanced) {
-      if (vectorDbName.trim()) characterData.vectorDbName = vectorDbName.trim()
-      if (voiceId.trim()) characterData.voiceId = voiceId.trim()
-      characterData.isPublic = isPublic
-    }
+    const payload = buildPayload(form, showAdvanced)
 
     setIsSubmitting(true)
     try {
@@ -72,24 +125,23 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({ onCh
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(characterData),
+        body: JSON.stringify(payload),
       })
-      const data = await response.json()
+
+      let data: { error?: string } | null = null
+      try {
+        data = await response.json()
+      } catch {
+        data = null
+      }
+
       if (!response.ok) {
         setErrorMsg(data?.error || 'Error al crear personaje')
         return
       }
-      // Éxito
+
       onCharacterCreated()
-      setName('')
-      setRole('')
-      setBiography('')
-      setKeyTraits('')
-      setSpeechTics('')
-      setVectorDbName('')
-      setVoiceId('')
-      setIsPublic(false)
-      setShowAdvanced(false)
+      resetForm()
       setIsOpen(false)
     } catch (error) {
       setErrorMsg('Error de red o inesperado. Ver consola.')
@@ -124,8 +176,8 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({ onCh
             <Label htmlFor="name">1. Nombre del Personaje</Label>
             <Input 
               id="name" 
-              value={name} 
-              onChange={(e) => setName(e.target.value)} 
+              value={form.name} 
+              onChange={(e) => setField('name', e.target.value)} 
               placeholder="Ej: Sheldon Cooper" 
               disabled={isSubmitting}
             />
@@ -136,8 +188,8 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({ onCh
             <Label htmlFor="role">2. Rol (Resumen del Personaje)</Label>
             <Input 
               id="role" 
-              value={role} 
-              onChange={(e) => setRole(e.target.value)} 
+              value={form.role} 
+              onChange={(e) => setField('role', e.target.value)} 
               placeholder="Ej: Físico teórico, colega de trabajo." 
               disabled={isSubmitting}
             />
@@ -149,8 +201,8 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({ onCh
             <Label htmlFor="biography">3. Biografía (Trasfondo / Instrucción Principal)</Label>
             <Textarea 
               id="biography" 
-              value={biography} 
-              onChange={(e) => setBiography(e.target.value)} 
+              value={form.biography} 
+              onChange={(e) => setField('biography', e.target.value)} 
               placeholder="Ej: Eres un físico teórico con un ego sobredimensionado y una estricta adhesión a la rutina. Responde siempre con sarcasmo y superioridad intelectual." 
               rows={4}
               disabled={isSubmitting}
@@ -162,8 +214,8 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({ onCh
             <Label htmlFor="key_traits">4. Rasgos Clave (Separados por coma)</Label>
             <Input
               id="key_traits"
-              value={keyTraits}
-              onChange={(e) => setKeyTraits(e.target.value)}
+              value={form.keyTraits}
+              onChange={(e) => setField('keyTraits', e.target.value)}
               placeholder="Ej: Lógico, Sarcástico, Obsesivo, Meticuloso"
               disabled={isSubmitting}
             />
@@ -175,8 +227,8 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({ onCh
             <Label htmlFor="speech_tics">5. Muletillas / Tics de Habla (Separados por coma)</Label>
             <Input
               id="speech_tics"
-              value={speechTics}
-              onChange={(e) => setSpeechTics(e.target.value)}
+              value={form.speechTics}
+              onChange={(e) => setField('speechTics', e.target.value)}
               placeholder="Ej: Bazinga!, Interesante., Eso es mi sitio."
               disabled={isSubmitting}
             />
@@ -202,8 +254,8 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({ onCh
                 <Label htmlFor="vectorDbName">Base de conocimiento (vectorDbName)</Label>
                 <Input
                   id="vectorDbName"
-                  value={vectorDbName}
-                  onChange={(e) => setVectorDbName(e.target.value)}
+                  value={form.vectorDbName}
+                  onChange={(e) => setField('vectorDbName', e.target.value)}
                   placeholder="Ej: sheldon_kb"
                   disabled={isSubmitting}
                 />
@@ -214,8 +266,8 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({ onCh
                 <Label htmlFor="voiceId">ID de voz (voiceId)</Label>
                 <Input
                   id="voiceId"
-                  value={voiceId}
-                  onChange={(e) => setVoiceId(e.target.value)}
+                  value={form.voiceId}
+                  onChange={(e) => setField('voiceId', e.target.value)}
                   placeholder="Ej: voice_123"
                   disabled={isSubmitting}
                 />
@@ -226,8 +278,8 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({ onCh
                 <input
                   id="isPublic"
                   type="checkbox"
-                  checked={isPublic}
-                  onChange={(e) => setIsPublic(e.target.checked)}
+                  checked={form.isPublic}
+                  onChange={(e) => setField('isPublic', e.target.checked)}
                   disabled={isSubmitting}
                   className="accent-purple-600"
                 />

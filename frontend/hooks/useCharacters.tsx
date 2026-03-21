@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import type { Character } from "../types/chat.types"
+import { normalizeBackendCharacters } from "@/utils/message.utils"
 
 export const useCharacters = (preselectedCharacterId?: string) => {
   const [availableCharacters, setAvailableCharacters] = useState<Character[]>([])
@@ -14,16 +15,19 @@ export const useCharacters = (preselectedCharacterId?: string) => {
         if (!response.ok) throw new Error(`Error HTTP ${response.status}`)
 
         const data: Character[] = await response.json()
-        setAvailableCharacters(data)
+        const normalizedCharacters = normalizeBackendCharacters(data)
+        setAvailableCharacters(normalizedCharacters)
 
-        if (data.length > 0) {
-          if (preselectedCharacterId && data.find((c) => c.id === preselectedCharacterId)) {
+        if (normalizedCharacters.length > 0) {
+          if (preselectedCharacterId && normalizedCharacters.find((c) => c.id === preselectedCharacterId)) {
             setSelectedCharacterId(preselectedCharacterId)
             localStorage.setItem("selected_character_id", preselectedCharacterId)
           } else {
             const storedCharacterId = localStorage.getItem("selected_character_id")
             const initialCharacterId =
-              storedCharacterId && data.find((c) => c.id === storedCharacterId) ? storedCharacterId : data[0].id
+              storedCharacterId && normalizedCharacters.find((c) => c.id === storedCharacterId)
+                ? storedCharacterId
+                : normalizedCharacters[0].id
             setSelectedCharacterId(initialCharacterId)
             localStorage.setItem("selected_character_id", initialCharacterId)
           }
