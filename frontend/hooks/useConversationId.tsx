@@ -9,7 +9,7 @@ interface CharacterReference {
     name: string;
 }
 
-export const useConversation = (initialConversationId: string) => {
+export const useConversation = (initialConversationId: string | null) => {
     const conversationId = initialConversationId
     
     // Estados para la data cargada
@@ -23,6 +23,8 @@ export const useConversation = (initialConversationId: string) => {
 
     useEffect(() => {
         if (!conversationId) {
+            setSelectedCharacter(null)
+            setMessages([])
             setIsLoading(false);
             return
         }

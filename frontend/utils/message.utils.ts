@@ -48,6 +48,10 @@ type BackendMessage = {
   metadata?: Record<string, unknown>
   conversationId?: string
   conversation_id?: string
+  speakerId?: string | null
+  speaker_character_id?: string | null
+  speakerName?: string | null
+  speaker_name?: string | null
 }
 
 type BackendCharacter = Omit<Character, "voiceId" | "vectorDbName"> & {
@@ -161,6 +165,8 @@ export const normalizeBackendMessage = (message: BackendMessage): Message => {
     durationMs: message.durationMs ?? message.duration_ms ?? null,
     timestamp: message.timestamp,
     conversationId: message.conversationId ?? message.conversation_id,
+    speakerId: message.speakerId ?? message.speaker_character_id ?? null,
+    speakerName: message.speakerName ?? message.speaker_name ?? null,
   }
 }
 

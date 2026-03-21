@@ -11,12 +11,23 @@ interface CharacterProfileProps {
   character: Character
 }
 
+interface SelectedConversation {
+  id: string
+  mode?: 'single' | 'debate'
+}
+
 export default function CharacterProfile({ character }: CharacterProfileProps) {
   const router = useRouter()
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
+  const [selectedConversation, setSelectedConversation] = useState<SelectedConversation | null>(null)
 
-  const handleSelectConversation = useCallback((conversationId: string) => {
-    setSelectedConversationId(conversationId)
+  const handleSelectConversation = useCallback((conversation: SelectedConversation) => {
+    setSelectedConversation(conversation)
+  }, [])
+
+  const initialMode = selectedConversation?.mode === 'debate' ? 'debate' : 'chat'
+
+  const handleConversationCreated = useCallback((conversation: SelectedConversation) => {
+    setSelectedConversation(conversation)
   }, [])
 
   return (
@@ -37,23 +48,21 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
           <CharacterContextPanel
             character={character}
             onSelectConversation={handleSelectConversation}
-            selectedConversationId={selectedConversationId || undefined}
+            selectedConversationId={selectedConversation?.id}
           />
         </div>
 
         {/* Right Panel - Conversation (40%) */}
         <div className="lg:w-[40%] flex flex-col relative min-h-0 overflow-hidden">
-          {selectedConversationId ? (
-            <div className="flex-1 min-h-0 p-4">
-              <ChatInterface conversationId={selectedConversationId} />
-            </div>
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-muted-foreground text-center px-4">
-                Selecciona una conversación para empezar
-              </p>
-            </div>
-          )}
+          <div className="flex-1 min-h-0 p-4">
+            <ChatInterface
+              conversationId={selectedConversation?.id ?? null}
+              defaultCharacterId={character.id}
+              defaultCharacterName={character.name}
+              initialMode={initialMode}
+              onConversationCreated={handleConversationCreated}
+            />
+          </div>
         </div>
       </div>
     </main>

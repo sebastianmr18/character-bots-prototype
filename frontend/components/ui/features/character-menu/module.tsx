@@ -128,6 +128,12 @@ export default function ChatsConversationsPage() {
         throw new Error('No se recibió el id de la conversación')
       }
 
+      window.dispatchEvent(
+        new CustomEvent('conversation:created', {
+          detail: { id: newConversationId, mode: 'single' },
+        }),
+      )
+
       await fetchAllData()
       router.push(`/chats/${newConversationId}`)
     } catch (error) {

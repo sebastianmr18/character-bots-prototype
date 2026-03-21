@@ -9,7 +9,7 @@ export interface AudioResolverResult {
 }
 
 export const useAudioResolver = (
-  conversationId: string,
+  conversationId: string | null,
   messages: Message[],
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
 ) => {
