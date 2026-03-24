@@ -1,7 +1,7 @@
 import type React from "react"
 import type { Message, CharacterReference } from "@/types/chat.types"
-import { AudioMessagePlayer } from "./AudioMessagePlayer"
-import { GenericRenderer } from "./genui/GenericRenderer"
+import { AudioMessagePlayer } from "@/components/ui/features/characters/shared/AudioMessagePlayer"
+import { GenericRenderer } from "@/components/ui/features/characters/genui/GenericRenderer"
 
 interface ChatMessagesProps {
   messages: Message[]

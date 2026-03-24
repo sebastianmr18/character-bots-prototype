@@ -102,7 +102,7 @@ export function CharacterContextPanel({ character, onSelectConversation, selecte
                 </div>
 
                 {/* Character Info */}
-                <div className="relative text-center mt-16">
+                <div className="relative text-center mt-16 bg-white/80 backdrop-blur-sm rounded-lg p-4">
                     <h1 className="font-serif text-2xl sm:text-3xl font-bold text-foreground mb-1">
                         {character.name}
                     </h1>

@@ -2,7 +2,7 @@
 
 import type React from "react"
 import type { Message, Character } from "@/types/chat.types"
-import { AudioMessagePlayer } from "@/components/ui/features/chat-interface/AudioMessagePlayer"
+import { AudioMessagePlayer } from "@/components/ui/features/characters/shared/AudioMessagePlayer"
 import { colorFromName, lightColorFromName } from "@/utils/character.utils"
 
 interface DebateChatMessagesProps {

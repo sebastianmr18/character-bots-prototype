@@ -4,8 +4,8 @@ import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import type { Character } from '@/types/chat.types'
-import { CharacterContextPanel } from '@/components/ui/features/characters/CharactersContextPanel'
-import ChatInterface from '@/components/ui/features/characters/ChatPanel'
+import { CharacterContextPanel } from '@/components/ui/features/characters/shared/CharactersContextPanel'
+import ChatInterface, { type ConversationMode } from '@/components/ui/features/characters/modes/chat/ChatMode'
 
 interface CharacterProfileProps {
   character: Character
@@ -16,19 +16,44 @@ interface SelectedConversation {
   mode?: 'single' | 'debate'
 }
 
+const getConversationMode = (conversation: SelectedConversation): 'single' | 'debate' =>
+  conversation.mode === 'debate' ? 'debate' : 'single'
+
 export default function CharacterProfile({ character }: CharacterProfileProps) {
   const router = useRouter()
-  const [selectedConversation, setSelectedConversation] = useState<SelectedConversation | null>(null)
+  const [activeMode, setActiveMode] = useState<ConversationMode>('chat')
+  const [lastSingleConversation, setLastSingleConversation] = useState<SelectedConversation | null>(null)
+  const [lastDebateConversation, setLastDebateConversation] = useState<SelectedConversation | null>(null)
 
   const handleSelectConversation = useCallback((conversation: SelectedConversation) => {
-    setSelectedConversation(conversation)
-  }, [])
+    if (getConversationMode(conversation) === 'debate') {
+      setLastDebateConversation({ id: conversation.id, mode: 'debate' })
+      setActiveMode('debate')
+      return
+    }
 
-  const initialMode = selectedConversation?.mode === 'debate' ? 'debate' : 'chat'
+    setLastSingleConversation({ id: conversation.id, mode: 'single' })
+    setActiveMode('chat')
+  }, [])
 
   const handleConversationCreated = useCallback((conversation: SelectedConversation) => {
-    setSelectedConversation(conversation)
+    if (getConversationMode(conversation) === 'debate') {
+      setLastDebateConversation({ id: conversation.id, mode: 'debate' })
+      setActiveMode('debate')
+      return
+    }
+
+    setLastSingleConversation({ id: conversation.id, mode: 'single' })
+    setActiveMode('chat')
   }, [])
+
+  const handleModeChange = useCallback((mode: ConversationMode) => {
+    setActiveMode(mode)
+  }, [])
+
+  const selectedConversationId = activeMode === 'debate'
+    ? lastDebateConversation?.id
+    : lastSingleConversation?.id
 
   return (
     <main className="min-h-screen bg-background flex flex-col">
@@ -48,7 +73,7 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
           <CharacterContextPanel
             character={character}
             onSelectConversation={handleSelectConversation}
-            selectedConversationId={selectedConversation?.id}
+            selectedConversationId={selectedConversationId}
           />
         </div>
 
@@ -56,10 +81,12 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
         <div className="lg:w-[40%] flex flex-col relative min-h-0 overflow-hidden">
           <div className="flex-1 min-h-0 p-4">
             <ChatInterface
-              conversationId={selectedConversation?.id ?? null}
+              activeMode={activeMode}
+              singleConversationId={lastSingleConversation?.id ?? null}
+              debateConversationId={lastDebateConversation?.id ?? null}
               defaultCharacterId={character.id}
               defaultCharacterName={character.name}
-              initialMode={initialMode}
+              onModeChange={handleModeChange}
               onConversationCreated={handleConversationCreated}
             />
           </div>

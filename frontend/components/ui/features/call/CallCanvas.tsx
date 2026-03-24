@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { CallModePanel } from "@/components/ui/features/characters/CallModePanel"
+import { CallModePanel } from "@/components/ui/features/characters/modes/call/CallMode"
 
 interface CallCanvasProps {
   characterId: string
