@@ -54,13 +54,15 @@ type BackendMessage = {
   speaker_name?: string | null
 }
 
-type BackendCharacter = Omit<Character, "voiceId" | "vectorDbName"> & {
+type BackendCharacter = Omit<Character, "voiceId" | "vectorDbName" | "imageUrl"> & {
   voiceId?: string | null
   voice_id?: string | null
   vectorDbName?: string | null
   vector_db_name?: string | null
   theme_color?: string | null
   theme_color_light?: string | null
+  imageUrl?: string | null
+  image_url?: string | null
 }
 
 const sanitizeValue = (value: unknown): unknown => {
@@ -180,6 +182,7 @@ export const normalizeBackendCharacter = (character: BackendCharacter): Characte
   vectorDbName: character.vectorDbName ?? character.vector_db_name ?? null,
   themeColor: character.themeColor ?? character.theme_color ?? null,
   themeColorLight: character.themeColorLight ?? character.theme_color_light ?? null,
+  imageUrl: character.imageUrl ?? character.image_url ?? null,
 })
 
 export const normalizeBackendCharacters = (characters: BackendCharacter[] = []): Character[] => {

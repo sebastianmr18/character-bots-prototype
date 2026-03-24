@@ -53,6 +53,7 @@ export interface Character {
   years?: string | null
   category?: string | null
   topics?: string[] | null
+  imageUrl?: string | null
 }
 
 export interface Conversation {

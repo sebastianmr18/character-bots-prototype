@@ -226,8 +226,19 @@ export default function ChatsConversationsPage() {
                   '--character-color-light': character.themeColorLight ?? lightColorFromName(character.name),
                 } as React.CSSProperties}
               >
-                {/* Título del Personaje y Botón de Nuevo Chat */}
+                {/* Header: imagen del personaje o placeholder con SVG + inicial */}
                 <div className="h-40 relative overflow-hidden">
+                  {character.imageUrl ? (
+                    <img
+                      src={character.imageUrl}
+                      alt={character.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none'
+                      }}
+                    />
+                  ) : null}
+                  {/* Placeholder: siempre presente debajo; visible si no hay imagen o falla la carga */}
                   <div className="absolute inset-0 opacity-20">
                     <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
                       <pattern id={`pattern-${character.id}`} patternUnits="userSpaceOnUse" width="20" height="20">
@@ -236,8 +247,6 @@ export default function ChatsConversationsPage() {
                       <rect width="100%" height="100%" fill={`url(#pattern-${character.id})`} />
                     </svg>
                   </div>
-
-                  {/* Character initial as placeholder */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span
                       className="text-6xl font-serif font-bold opacity-30"
