@@ -183,7 +183,7 @@ export default function ChatsConversationsPage() {
                 } as React.CSSProperties}
               >
                 {/* Header: imagen del personaje o placeholder con SVG + inicial */}
-                <div className="h-40 relative overflow-hidden">
+                <div className="h-80 relative overflow-hidden">
                   {character.imageUrl ? (
                     <img
                       src={character.imageUrl}
