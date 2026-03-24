@@ -14,8 +14,10 @@ interface CharacterContextPanelProps {
 export function CharacterContextPanel({ character, onSelectConversation, selectedConversationId }: CharacterContextPanelProps) {
     const themeColor = character.themeColor ?? colorFromName(character.name)
     const themeColorLight = character.themeColorLight ?? lightColorFromName(character.name)
+    const characterImageUrl = character.imageUrl ?? (character as Character & { image_url?: string | null }).image_url ?? null;
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [isLoadingConversations, setIsLoadingConversations] = useState(true);
+    const [avatarImageError, setAvatarImageError] = useState(false);
 
     const fetchConversations = useCallback(async () => {
         try {
@@ -49,6 +51,10 @@ export function CharacterContextPanel({ character, onSelectConversation, selecte
         };
     }, [fetchConversations]);
 
+    useEffect(() => {
+        setAvatarImageError(false);
+    }, [characterImageUrl]);
+
     return (
         <div className="h-full flex flex-col">
             {/* Ambient Header */}
@@ -69,12 +75,21 @@ export function CharacterContextPanel({ character, onSelectConversation, selecte
                 {/* Character Avatar */}
                 <div className="absolute top-8 left-1/2 -translate-x-1/2">
                     <div
-                        className="w-24 h-24 sm:w-32 sm:h-32 rounded-full flex items-center justify-center border-4 border-background shadow-xl"
+                        className="w-24 h-24 sm:w-32 sm:h-32 rounded-full flex items-center justify-center border-4 border-background shadow-xl overflow-hidden"
                         style={{ backgroundColor: themeColor }}
                     >
-                        <span className="text-4xl sm:text-5xl font-serif font-bold text-white">
-                            {character.name[0]}
-                        </span>
+                        {characterImageUrl && !avatarImageError ? (
+                            <img
+                                src={characterImageUrl}
+                                alt={character.name}
+                                className="w-full h-full object-cover"
+                                onError={() => setAvatarImageError(true)}
+                            />
+                        ) : (
+                            <span className="text-4xl sm:text-5xl font-serif font-bold text-white">
+                                {character.name[0]}
+                            </span>
+                        )}
                     </div>
                 </div>
 
