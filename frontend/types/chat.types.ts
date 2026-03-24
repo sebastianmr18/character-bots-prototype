@@ -54,6 +54,7 @@ export interface Character {
   category?: string | null
   topics?: string[] | null
   imageUrl?: string | null
+  backgroundImageUrl?: string | null
 }
 
 export interface Conversation {

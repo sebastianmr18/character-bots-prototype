@@ -15,6 +15,7 @@ export function CharacterContextPanel({ character, onSelectConversation, selecte
     const themeColor = character.themeColor ?? colorFromName(character.name)
     const themeColorLight = character.themeColorLight ?? lightColorFromName(character.name)
     const characterImageUrl = character.imageUrl ?? (character as Character & { image_url?: string | null }).image_url ?? null;
+    const backgroundImageUrl = character.backgroundImageUrl ?? null;
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [isLoadingConversations, setIsLoadingConversations] = useState(true);
     const [avatarImageError, setAvatarImageError] = useState(false);
@@ -60,7 +61,14 @@ export function CharacterContextPanel({ character, onSelectConversation, selecte
             {/* Ambient Header */}
             <div
                 className="relative h-64 sm:h-80 flex flex-col justify-end p-6"
-                style={{ backgroundColor: themeColorLight }}
+                style={{
+                    backgroundColor: themeColorLight,
+                    ...(backgroundImageUrl && {
+                        backgroundImage: `url(${backgroundImageUrl})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                    }),
+                }}
             >
                 {/* Background Pattern */}
                 <div className="absolute inset-0 opacity-10">
