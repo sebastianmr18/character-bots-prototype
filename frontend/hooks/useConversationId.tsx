@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import type { Message, Character } from "@/types/chat.types"
+import type { Message, Character, Conversation } from "@/types/chat.types"
 import { normalizeBackendCharacter, normalizeBackendMessages } from "@/utils/message.utils"
 
 interface CharacterReference {
@@ -9,25 +9,47 @@ interface CharacterReference {
     name: string;
 }
 
-export const useConversation = (initialConversationId: string) => {
+interface UseConversationOptions {
+    expectedMode?: Conversation['mode']
+}
+
+const normalizeConversationMode = (mode?: Conversation['mode']) =>
+    mode === 'debate' ? 'debate' : 'single'
+
+export const useConversation = (initialConversationId: string | null, options: UseConversationOptions = {}) => {
     const conversationId = initialConversationId
+    const expectedMode = options.expectedMode
     
     // Estados para la data cargada
     const [messages, setMessages] = useState<Message[]>([])
     const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null)
     const [isLoading, setIsLoading] = useState(true)
+    const [conversationMode, setConversationMode] = useState<Conversation['mode'] | null>(null)
 
     const availableCharacters: CharacterReference[] = selectedCharacter 
         ? [{ id: selectedCharacter.id, name: selectedCharacter.name }] 
         : []
 
+    const isModeCompatible = expectedMode
+        ? conversationMode === null
+            ? !conversationId
+            : conversationMode === expectedMode
+        : true
+
     useEffect(() => {
         if (!conversationId) {
+            setSelectedCharacter(null)
+            setMessages([])
+            setConversationMode(null)
             setIsLoading(false);
             return
         }
 
         setIsLoading(true)
+        setSelectedCharacter(null)
+        setMessages([])
+        setConversationMode(null)
+        let isCancelled = false
 
         const fetchConversationData = async () => {
             try {
@@ -39,30 +61,52 @@ export const useConversation = (initialConversationId: string) => {
 
                 const data: { 
                     id: string, 
+                    mode?: Conversation['mode'],
                     character: Character, 
                     messages: Message[] 
                 } = await response.json()
+
+                if (isCancelled) return
+
+                const resolvedMode = normalizeConversationMode(data.mode)
+                setConversationMode(resolvedMode)
+
+                if (expectedMode && resolvedMode !== expectedMode) {
+                    setSelectedCharacter(null)
+                    setMessages([])
+                    return
+                }
                 
                 setSelectedCharacter(normalizeBackendCharacter(data.character))
                 setMessages(normalizeBackendMessages(data.messages || []))
 
             } catch (error) {
+                if (isCancelled) return
                 console.error("Error al cargar la conversación:", error)
                 setSelectedCharacter(null)
                 setMessages([])
+                setConversationMode(null)
             } finally {
-                setIsLoading(false)
+                if (!isCancelled) {
+                    setIsLoading(false)
+                }
             }
         }
 
         fetchConversationData()
 
-    }, [conversationId])
+        return () => {
+            isCancelled = true
+        }
+
+    }, [conversationId, expectedMode])
 
     return { 
         conversationId, 
         messages, 
         setMessages, 
+        conversationMode,
+        isModeCompatible,
         selectedCharacterId: selectedCharacter?.id || null,
         characterName: selectedCharacter?.name || "Cargando...",
         characterBiography: selectedCharacter?.biography || "Biografia no disponible.",

@@ -19,41 +19,6 @@ import { getErrorMessage } from '@/utils/api.utils'
 import { ArrowLeft, Sparkles, MessageSquare } from 'lucide-react'
 import { toSlug, colorFromName, lightColorFromName } from '@/utils/character.utils'
 
-// Se define el tipo para la estructura de agrupación
-type GroupedChats = {
-  [characterId: string]: {
-    character: Character
-    chats: Conversation[]
-  }
-}
-
-/**
- * Función de ayuda para agrupar las conversaciones bajo su respectivo personaje.
- * Asegura que todos los personajes aparezcan, incluso si no tienen chats.
- */
-const groupConversationsByCharacter = (
-  characters: Character[],
-  conversations: Conversation[],
-): GroupedChats => {
-  const grouped: GroupedChats = Object.fromEntries(
-    characters.map((character) => [character.id, { character, chats: [] }]),
-  )
-
-  for (const conversation of conversations) {
-    const characterId = conversation.characterId ?? conversation.character?.id
-    if (!characterId || !grouped[characterId]) continue
-    grouped[characterId].chats.push(conversation)
-  }
-
-  for (const entry of Object.values(grouped)) {
-    entry.chats.sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    )
-  }
-
-  return grouped
-}
-
 export default function ChatsConversationsPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -61,27 +26,18 @@ export default function ChatsConversationsPage() {
   const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null)
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null)
   const [operationError, setOperationError] = useState<string | null>(null)
-  const [groupedChats, setGroupedChats] = useState<GroupedChats>({})
+  const [characters, setCharacters] = useState<Character[]>([])
 
   const fetchAllData = useCallback(async () => {
     try {
       setLoading(true)
 
-      // Carga paralela de personajes y conversaciones
-      const [charResponse, convResponse] = await Promise.all([
-        fetch('/api/characters'),
-        fetch('/api/conversations'),
-      ])
+      const charResponse = await fetch('/api/characters')
 
       if (!charResponse.ok) throw new Error(`Error HTTP Personajes ${charResponse.status}`)
-      if (!convResponse.ok) throw new Error(`Error HTTP Conversaciones ${convResponse.status}`)
 
       const charactersData: Character[] = await charResponse.json()
-      const conversationsData: Conversation[] = await convResponse.json()
-
-      // Agrupación
-      const grouped = groupConversationsByCharacter(charactersData, conversationsData)
-      setGroupedChats(grouped)
+      setCharacters(charactersData)
 
     } catch (error) {
       console.error('Error al cargar datos:', error)
@@ -90,7 +46,7 @@ export default function ChatsConversationsPage() {
     }
   }, [])
 
-  // 1. Carga de datos y Agrupación
+  // 1. Carga de datos
   useEffect(() => {
     fetchAllData()
   }, [fetchAllData])
@@ -127,6 +83,12 @@ export default function ChatsConversationsPage() {
       if (!newConversationId) {
         throw new Error('No se recibió el id de la conversación')
       }
+
+      window.dispatchEvent(
+        new CustomEvent('conversation:created', {
+          detail: { id: newConversationId, mode: 'single' },
+        }),
+      )
 
       await fetchAllData()
       router.push(`/chats/${newConversationId}`)
@@ -175,12 +137,12 @@ export default function ChatsConversationsPage() {
   if (loading) {
     return (
       <main className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-gray-600 dark:text-gray-400 animate-pulse text-xl">Cargando personajes y conversaciones... ⏳</p>
+        <p className="text-gray-600 dark:text-gray-400 animate-pulse text-xl">Cargando personajes... ⏳</p>
       </main>
     )
   }
 
-  const allCharacters = Object.values(groupedChats);
+  const allCharacters = characters
 
   return (
     <main className="min-h-screen bg-background">
@@ -210,7 +172,7 @@ export default function ChatsConversationsPage() {
 
         {allCharacters.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {allCharacters.map(({ character, chats }) => (
+            {allCharacters.map((character) => (
               <div
                 key={character.id}
                 className="group relative rounded-lg overflow-hidden bg-card border border-border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
@@ -220,8 +182,19 @@ export default function ChatsConversationsPage() {
                   '--character-color-light': character.themeColorLight ?? lightColorFromName(character.name),
                 } as React.CSSProperties}
               >
-                {/* Título del Personaje y Botón de Nuevo Chat */}
-                <div className="h-40 relative overflow-hidden">
+                {/* Header: imagen del personaje o placeholder con SVG + inicial */}
+                <div className="h-80 relative overflow-hidden">
+                  {character.imageUrl ? (
+                    <img
+                      src={character.imageUrl}
+                      alt={character.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none'
+                      }}
+                    />
+                  ) : null}
+                  {/* Placeholder: siempre presente debajo; visible si no hay imagen o falla la carga */}
                   <div className="absolute inset-0 opacity-20">
                     <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
                       <pattern id={`pattern-${character.id}`} patternUnits="userSpaceOnUse" width="20" height="20">
@@ -230,8 +203,6 @@ export default function ChatsConversationsPage() {
                       <rect width="100%" height="100%" fill={`url(#pattern-${character.id})`} />
                     </svg>
                   </div>
-
-                  {/* Character initial as placeholder */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span
                       className="text-6xl font-serif font-bold opacity-30"

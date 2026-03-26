@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Mic, MicOff, Pause, Play, Phone, PhoneOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useCharacterById } from "@/hooks/useCharacterById"
-import { useGeminiLive } from "@/hooks/useGeminiLive"
+import { useBackendLive } from "@/hooks/useBackendLive"
 import { ConnectionStatus } from "@/types/live.types"
 
 interface CallModePanelProps {
@@ -48,7 +48,7 @@ export function CallModePanel({ characterId, onEndCall }: CallModePanelProps) {
   const { character, isLoading, error } = useCharacterById(characterId)
   const systemInstruction = useMemo(() => buildSystemInstruction(character), [character])
 
-  const { status, history, isMuted, setIsMuted, connect, disconnect, isSearching } = useGeminiLive(
+  const { status, history, isMuted, setIsMuted, connect, disconnect, isSearching } = useBackendLive(
     systemInstruction,
     characterId ?? ""
   )

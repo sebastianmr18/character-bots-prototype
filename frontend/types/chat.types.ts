@@ -31,6 +31,8 @@ export interface Message {
   durationMs?: number | null
   timestamp?: string
   conversationId?: string
+  speakerId?: string | null
+  speakerName?: string | null
 }
 
 export interface CharacterReference {
@@ -51,6 +53,8 @@ export interface Character {
   years?: string | null
   category?: string | null
   topics?: string[] | null
+  imageUrl?: string | null
+  backgroundImageUrl?: string | null
 }
 
 export interface Conversation {
@@ -59,6 +63,38 @@ export interface Conversation {
   characterId?: string
   character: Character
   messages: Message[]
+  mode?: "single" | "debate"
+  secondaryCharacter?: Character | null
+}
+
+export interface DebateResponse {
+  message_id: number | string
+  text: string
+  speaker_id: string
+  speaker_name: string
+  audio?: string | null
+  warning?: {
+    code: string
+    message: string
+    stage: string
+    retryable: boolean
+  } | null
+}
+
+export interface DebateTurnResultPayload {
+  conversationId: string
+  traceId: string
+  user_message_id: number | string
+  user_text: string
+  responses: DebateResponse[]
+}
+
+export interface DebateErrorPayload {
+  traceId: string
+  message: string
+  code: string
+  stage: string
+  retryable: boolean
 }
 
 export interface WebSocketMessage {

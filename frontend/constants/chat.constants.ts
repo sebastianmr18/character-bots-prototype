@@ -1,4 +1,5 @@
 export const WS_URL = `${process.env.NEXT_PUBLIC_WS_BASE_URL}/ws/chat/`;
+export const LIVE_WS_URL = `${process.env.NEXT_PUBLIC_WS_BASE_URL}/live`;
 export const CONVERSATION_ID_PREFIX = "chat_id_char_"
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 export const DEFAULT_AUDIO_TYPE = "audio/mp3"

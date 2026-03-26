@@ -48,15 +48,23 @@ type BackendMessage = {
   metadata?: Record<string, unknown>
   conversationId?: string
   conversation_id?: string
+  speakerId?: string | null
+  speaker_character_id?: string | null
+  speakerName?: string | null
+  speaker_name?: string | null
 }
 
-type BackendCharacter = Omit<Character, "voiceId" | "vectorDbName"> & {
+type BackendCharacter = Omit<Character, "voiceId" | "vectorDbName" | "imageUrl" | "backgroundImageUrl"> & {
   voiceId?: string | null
   voice_id?: string | null
   vectorDbName?: string | null
   vector_db_name?: string | null
   theme_color?: string | null
   theme_color_light?: string | null
+  imageUrl?: string | null
+  image_url?: string | null
+  backgroundImageUrl?: string | null
+  background_image_url?: string | null
 }
 
 const sanitizeValue = (value: unknown): unknown => {
@@ -161,6 +169,8 @@ export const normalizeBackendMessage = (message: BackendMessage): Message => {
     durationMs: message.durationMs ?? message.duration_ms ?? null,
     timestamp: message.timestamp,
     conversationId: message.conversationId ?? message.conversation_id,
+    speakerId: message.speakerId ?? message.speaker_character_id ?? null,
+    speakerName: message.speakerName ?? message.speaker_name ?? null,
   }
 }
 
@@ -174,6 +184,8 @@ export const normalizeBackendCharacter = (character: BackendCharacter): Characte
   vectorDbName: character.vectorDbName ?? character.vector_db_name ?? null,
   themeColor: character.themeColor ?? character.theme_color ?? null,
   themeColorLight: character.themeColorLight ?? character.theme_color_light ?? null,
+  imageUrl: character.imageUrl ?? character.image_url ?? null,
+  backgroundImageUrl: character.backgroundImageUrl ?? character.background_image_url ?? null,
 })
 
 export const normalizeBackendCharacters = (characters: BackendCharacter[] = []): Character[] => {

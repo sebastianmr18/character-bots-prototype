@@ -1,6 +1,6 @@
 import type React from "react"
 import type { UIComponentName } from "@/types/chat.types"
-import { InfoCard, parseInfoCardProps } from "./InfoCard"
+import { InfoCard, parseInfoCardProps } from "./blocks/InfoCard"
 
 type Renderer = (props: unknown) => React.ReactNode
 
