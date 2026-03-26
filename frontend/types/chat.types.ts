@@ -1,7 +1,29 @@
+export type MessageSchemaVersion = "v1_plain" | "v2_blocks"
+
+export type UIComponentName = "InfoCard"
+
+export interface TextBlock {
+  id?: string
+  type: "text"
+  content: string
+}
+
+export interface ComponentBlock {
+  id?: string
+  type: "component"
+  componentName: UIComponentName | string
+  props?: Record<string, unknown>
+}
+
+export type MessageBlock = TextBlock | ComponentBlock
+
 export interface Message {
   id: number | string
   role: "user" | "assistant"
   content: string
+  schemaVersion?: MessageSchemaVersion
+  blocks?: MessageBlock[]
+  metadata?: Record<string, unknown>
   audioPath?: string | null
   audioUrl?: string | null
   audioStorageId?: string | null
@@ -9,6 +31,8 @@ export interface Message {
   durationMs?: number | null
   timestamp?: string
   conversationId?: string
+  speakerId?: string | null
+  speakerName?: string | null
 }
 
 export interface CharacterReference {
@@ -22,14 +46,55 @@ export interface Character {
   description: string
   role: string
   biography: string
-  voice_id: string
+  voiceId?: string | null
+  vectorDbName?: string | null
+  themeColor?: string | null
+  themeColorLight?: string | null
+  years?: string | null
+  category?: string | null
+  topics?: string[] | null
+  imageUrl?: string | null
+  backgroundImageUrl?: string | null
 }
 
 export interface Conversation {
   id: string
   createdAt: string
+  characterId?: string
   character: Character
   messages: Message[]
+  mode?: "single" | "debate"
+  secondaryCharacter?: Character | null
+}
+
+export interface DebateResponse {
+  message_id: number | string
+  text: string
+  speaker_id: string
+  speaker_name: string
+  audio?: string | null
+  warning?: {
+    code: string
+    message: string
+    stage: string
+    retryable: boolean
+  } | null
+}
+
+export interface DebateTurnResultPayload {
+  conversationId: string
+  traceId: string
+  user_message_id: number | string
+  user_text: string
+  responses: DebateResponse[]
+}
+
+export interface DebateErrorPayload {
+  traceId: string
+  message: string
+  code: string
+  stage: string
+  retryable: boolean
 }
 
 export interface WebSocketMessage {
@@ -44,8 +109,11 @@ export interface WebSocketMessage {
 export interface AiMessagePayload {
   message_id?: number | string
   messageId?: number | string
-  text: string
+  text?: string
   content?: string
+  schemaVersion?: MessageSchemaVersion
+  schema_version?: MessageSchemaVersion
+  blocks?: MessageBlock[]
   audio?: string
   audioPath?: string | null
   audio_path?: string | null
@@ -53,6 +121,7 @@ export interface AiMessagePayload {
   audio_url?: string | null
   mediaType?: string | null
   media_type?: string | null
+  metadata?: Record<string, unknown>
 }
 
 export interface StatusDisplayConfig {

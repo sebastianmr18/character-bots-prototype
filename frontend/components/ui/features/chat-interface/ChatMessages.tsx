@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Message, CharacterReference } from "@/types/chat.types"
 import { AudioMessagePlayer } from "./AudioMessagePlayer"
+import { GenericRenderer } from "./genui/GenericRenderer"
 
 interface ChatMessagesProps {
   messages: Message[]
@@ -19,6 +20,10 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   messagesEndRef,
   resolveAudioUrl,
 }) => {
+  const hasRenderableBlocks = (message: Message) => {
+    return Array.isArray(message.blocks) && message.blocks.length > 0
+  }
+
   if (messages.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center">
@@ -81,7 +86,11 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
                 }
               `}
             >
-              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+              {hasRenderableBlocks(msg) ? (
+                <GenericRenderer blocks={msg.blocks ?? []} />
+              ) : (
+                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+              )}
               {msg.role === "assistant" && (
                 <AudioMessagePlayer
                   messageId={msg.id}

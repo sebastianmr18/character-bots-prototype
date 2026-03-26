@@ -11,7 +11,7 @@ export async function fetchWithAuth(endpoint: string, options: RequestInit = {},
     headers.set('Authorization', `Bearer ${session.access_token}`);
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const baseUrl = process.env.NEXT_PUBLIC_WS_BASE_URL || 'http://localhost:8000';
 
   const response = await fetch(`${baseUrl}${endpoint}`, {
     ...options,

@@ -267,6 +267,10 @@ pyrightconfig.json
 
 .vscode/
 
-/.github
+.github/agents
+
+*.md
+
+.cursorrules
 
 # End of https://www.toptal.com/developers/gitignore/api/python,django

@@ -45,8 +45,7 @@ export async function updateSession(request: NextRequest) {
 
   // 1. Definición de rutas
   const isAuthRoute = path.startsWith('/login') || path.startsWith('/auth')
-  const isProtectedRoute = path.startsWith('/home') || 
-                           path.startsWith('/chats') || 
+  const isProtectedRoute = path.startsWith('/chats') || 
                            path.startsWith('/call') ||
                            path.startsWith('/profile')
 
@@ -60,7 +59,7 @@ export async function updateSession(request: NextRequest) {
 
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone()
-    url.pathname = '/home'
+    url.pathname = '/'
     return NextResponse.redirect(url)
   }
 
