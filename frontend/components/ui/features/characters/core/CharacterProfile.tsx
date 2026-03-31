@@ -24,6 +24,7 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
   const [activeMode, setActiveMode] = useState<ConversationMode>('chat')
   const [lastSingleConversation, setLastSingleConversation] = useState<SelectedConversation | null>(null)
   const [lastDebateConversation, setLastDebateConversation] = useState<SelectedConversation | null>(null)
+  const [isInitialHistoryLoaded, setIsInitialHistoryLoaded] = useState(false)
 
   const handleSelectConversation = useCallback((conversation: SelectedConversation) => {
     if (getConversationMode(conversation) === 'debate') {
@@ -74,6 +75,7 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
             character={character}
             onSelectConversation={handleSelectConversation}
             selectedConversationId={selectedConversationId}
+            onInitialHistoryLoaded={() => setIsInitialHistoryLoaded(true)}
           />
         </div>
 
@@ -86,6 +88,7 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
               debateConversationId={lastDebateConversation?.id ?? null}
               defaultCharacterId={character.id}
               defaultCharacterName={character.name}
+              isInitialHistoryLoaded={isInitialHistoryLoaded}
               onModeChange={handleModeChange}
               onConversationCreated={handleConversationCreated}
             />

@@ -17,6 +17,7 @@ interface ChatInputProps {
   isConnected: boolean
   isModalOpen: boolean
   selectedCharacterId: string | null
+  canSendMessages?: boolean
   availableCharacters: Array<{ id: string; name: string }>
   onSendMessage: (text: string) => void
   onToggleRecording: () => void
@@ -28,6 +29,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   isConnected,
   isModalOpen,
   selectedCharacterId,
+  canSendMessages = true,
   availableCharacters,
   onSendMessage,
   onToggleRecording,
@@ -45,7 +47,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const characterName =
     availableCharacters.find((c) => c.id === selectedCharacterId)?.name || "el personaje"
 
-  const inputDisabled = isRecording || !isConnected || isModalOpen
+  const inputDisabled = isRecording || isModalOpen || !canSendMessages
 
   return (
     <div className="space-y-2">
@@ -78,7 +80,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           size="icon"
           variant={isRecording ? "destructive" : "outline"}
           onClick={onToggleRecording}
-          disabled={!isConnected || isModalOpen}
+          disabled={!isConnected || isModalOpen || !canSendMessages}
           aria-label={isRecording ? "Detener grabación" : "Grabar mensaje de voz"}
           className="shrink-0"
         >
@@ -87,7 +89,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <Button
           type="submit"
           size="icon"
-          disabled={!input.trim() || isRecording || !isConnected}
+          disabled={!input.trim() || isRecording || isModalOpen || !canSendMessages}
           aria-label="Enviar mensaje"
           className="shrink-0"
         >

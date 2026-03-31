@@ -9,9 +9,15 @@ interface CharacterContextPanelProps {
     character: Character;
     onSelectConversation?: (conversation: { id: string; mode?: 'single' | 'debate' }) => void;
     selectedConversationId?: string;
+    onInitialHistoryLoaded?: () => void;
 }
 
-export function CharacterContextPanel({ character, onSelectConversation, selectedConversationId }: CharacterContextPanelProps) {
+export function CharacterContextPanel({
+    character,
+    onSelectConversation,
+    selectedConversationId,
+    onInitialHistoryLoaded,
+}: CharacterContextPanelProps) {
     const themeColor = character.themeColor ?? colorFromName(character.name)
     const themeColorLight = character.themeColorLight ?? lightColorFromName(character.name)
     const characterImageUrl = character.imageUrl ?? (character as Character & { image_url?: string | null }).image_url ?? null;
@@ -19,6 +25,7 @@ export function CharacterContextPanel({ character, onSelectConversation, selecte
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [isLoadingConversations, setIsLoadingConversations] = useState(true);
     const [avatarImageError, setAvatarImageError] = useState(false);
+    const [hasNotifiedInitialHistoryLoaded, setHasNotifiedInitialHistoryLoaded] = useState(false);
 
     const fetchConversations = useCallback(async () => {
         try {
@@ -34,8 +41,13 @@ export function CharacterContextPanel({ character, onSelectConversation, selecte
             console.error('Error al cargar conversaciones:', err);
         } finally {
             setIsLoadingConversations(false);
+
+            if (!hasNotifiedInitialHistoryLoaded) {
+                onInitialHistoryLoaded?.();
+                setHasNotifiedInitialHistoryLoaded(true);
+            }
         }
-    }, [character.id]);
+    }, [character.id, hasNotifiedInitialHistoryLoaded, onInitialHistoryLoaded]);
 
     useEffect(() => {
         fetchConversations();

@@ -12,6 +12,7 @@ import { useAudioResolver } from "@/hooks/useAudioResolver"
 import { ChatInput } from "@/components/ui/features/characters/modes/chat/ChatInput"
 import { ChatMessages } from "@/components/ui/features/characters/modes/chat/ChatMessages"
 import { MessageSquare, Phone, Swords, GraduationCap } from "lucide-react"
+import { getErrorMessage } from "@/utils/api.utils"
 
 export type ConversationMode = "chat" | "call" | "interview" | "debate" | "professor"
 
@@ -21,6 +22,7 @@ interface ChatInterfaceProps {
   debateConversationId: string | null
   defaultCharacterId?: string | null
   defaultCharacterName?: string
+  isInitialHistoryLoaded?: boolean
   onModeChange?: (mode: ConversationMode) => void
   onConversationCreated?: (conversation: { id: string; mode?: "single" | "debate" }) => void
 }
@@ -38,11 +40,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   debateConversationId,
   defaultCharacterId = null,
   defaultCharacterName,
+  isInitialHistoryLoaded = false,
   onModeChange,
   onConversationCreated,
 }) => {
   const [status, setStatus] = useState("Desconectado")
-  const chatConversationId = activeMode === "chat" ? singleConversationId : null
+  const [localSingleConversationId, setLocalSingleConversationId] = useState<string | null>(singleConversationId)
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false)
+  const pendingTextQueueRef = useRef<string[]>([])
+
+  useEffect(() => {
+    setLocalSingleConversationId(singleConversationId)
+  }, [singleConversationId])
+
+  const chatConversationId = activeMode === "chat" ? localSingleConversationId : null
   const debateConversationIdForPanel = activeMode === "debate" ? debateConversationId : null
 
   const {
@@ -132,11 +143,79 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     scrollToBottom()
   }, [messages, scrollToBottom])
 
-  const handleSendMessage = (text: string) => {
-    if (!text.trim() || !chatConversationId || !isModeCompatible) return
+  const createSingleConversation = useCallback(async (): Promise<string | null> => {
+    if (!effectiveCharacterId || isCreatingConversation) return null
+
+    try {
+      setIsCreatingConversation(true)
+      setStatus("Iniciando conversación...")
+
+      const response = await fetch("/api/conversations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ characterId: effectiveCharacterId }),
+      })
+
+      if (!response.ok) {
+        const message = await getErrorMessage(response)
+        throw new Error(message)
+      }
+
+      const payload: { id?: string } = await response.json()
+      if (!payload.id) {
+        throw new Error("No se recibió el id de la conversación")
+      }
+
+      setLocalSingleConversationId(payload.id)
+      onConversationCreated?.({ id: payload.id, mode: "single" })
+      window.dispatchEvent(
+        new CustomEvent("conversation:created", {
+          detail: { id: payload.id, mode: "single" },
+        }),
+      )
+
+      return payload.id
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error al iniciar conversación"
+      setStatus(`Error: ${message}`)
+      return null
+    } finally {
+      setIsCreatingConversation(false)
+    }
+  }, [effectiveCharacterId, isCreatingConversation, onConversationCreated])
+
+  const handleSendMessage = async (text: string) => {
+    if (!isInitialHistoryLoaded || !text.trim() || !effectiveCharacterId) return
+
+    let currentConversationId = chatConversationId
+
+    if (!currentConversationId) {
+      currentConversationId = await createSingleConversation()
+      if (!currentConversationId) return
+    }
+
     setMessages((prev) => [...prev, { id: -Date.now(), role: "user", content: text }])
-    sendMessage(text)
+
+    if (isConnected && isModeCompatible) {
+      sendMessage(text)
+      return
+    }
+
+    pendingTextQueueRef.current.push(text)
+    setStatus("Conectando para enviar mensaje...")
   }
+
+  useEffect(() => {
+    if (!chatConversationId || !isModeCompatible || !isConnected) return
+    if (pendingTextQueueRef.current.length === 0) return
+
+    const queuedMessages = [...pendingTextQueueRef.current]
+    pendingTextQueueRef.current = []
+
+    queuedMessages.forEach((queuedText) => sendMessage(queuedText))
+  }, [chatConversationId, isModeCompatible, isConnected, sendMessage])
 
   const handleToggleRecording = async () => {
     try {
@@ -238,7 +317,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               <div className="flex flex-col items-center justify-center h-full text-center py-8">
                 <h3 className="text-base font-semibold mb-1 text-foreground">No hay conversación activa</h3>
                 <p className="text-sm text-muted-foreground max-w-xs">
-                  Selecciona una conversación del historial o cambia a otra pestaña para continuar.
+                  {isInitialHistoryLoaded
+                    ? "Escribe tu primer mensaje para crear una conversación automáticamente o selecciona una del historial."
+                    : "Cargando historial de conversaciones... cuando termine, podrás enviar tu primer mensaje."}
                 </p>
               </div>
             )}
@@ -251,6 +332,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               isConnected={Boolean(showChatConversation && isConnected)}
               isModalOpen={showVoiceModal}
               selectedCharacterId={effectiveCharacterId}
+              canSendMessages={Boolean(effectiveCharacterId && !isCreatingConversation && isInitialHistoryLoaded)}
               availableCharacters={effectiveAvailableCharacters}
               onSendMessage={handleSendMessage}
               onToggleRecording={handleToggleRecording}
