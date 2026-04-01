@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import { io, Socket } from "socket.io-client"
 import { WS_URL } from "@/constants/chat.constants"
-import type { Message, AiMessagePayload } from "@/types/chat.types"
+import type { Message, AiMessagePayload, SuggestionsPayload } from "@/types/chat.types"
 import {
   normalizeAiMessagePayload,
   mergeMessageCollection,
@@ -21,6 +21,7 @@ interface UseWebSocketChatProps {
   onMessagesUpdate: (updater: (prev: Message[]) => Message[]) => void
   onTranscriptionResult: (text: string) => void
   onNoSpeech?: () => void
+  onSuggestionsReceived?: (suggestions: string[]) => void
 }
 
 export const useWebSocketChat = ({
@@ -30,10 +31,13 @@ export const useWebSocketChat = ({
   onMessagesUpdate,
   onTranscriptionResult,
   onNoSpeech,
+  onSuggestionsReceived,
 }: UseWebSocketChatProps) => {
   const socketRef = useRef<Socket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
+  const [isTyping, setIsTyping] = useState(false)
   const lastTranscriptionEventRef = useRef<{ text: string; timestamp: number } | null>(null)
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { startPolling, stopPolling } = useMessagePolling(
     conversationId,
@@ -61,7 +65,22 @@ export const useWebSocketChat = ({
 
     const setDisconnectedState = () => {
       setIsConnected(false)
+      setIsTyping(false)
       stopPolling()
+    }
+
+    const clearTypingTimeout = () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+        typingTimeoutRef.current = null
+      }
+    }
+
+    const armTypingTimeout = () => {
+      clearTypingTimeout()
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false)
+      }, 15000)
     }
 
     const attachCommonHandlers = () => {
@@ -70,6 +89,7 @@ export const useWebSocketChat = ({
       socket.on("connect", () => {
         onStatusChange("Conectado")
         setIsConnected(true)
+        setIsTyping(false)
         socket?.emit("join_chat", conversationId)
       })
 
@@ -109,10 +129,20 @@ export const useWebSocketChat = ({
       })
 
       socket.on("bot_typing", () => {
+        setIsTyping(true)
+        armTypingTimeout()
         onStatusChange("Escribiendo...")
       })
 
+      socket.on("suggestions", (data: SuggestionsPayload) => {
+        if (!Array.isArray(data?.suggestions)) return
+        onSuggestionsReceived?.(data.suggestions)
+      })
+
       socket.on("ai_message", (data: AiMessagePayload) => {
+        setIsTyping(false)
+        clearTypingTimeout()
+
         const normalizedMessage = normalizeAiMessagePayload(data)
         const mediaType = normalizedMessage.mediaType ?? null
 
@@ -163,6 +193,7 @@ export const useWebSocketChat = ({
       })
 
       socket.on("disconnect", () => {
+        clearTypingTimeout()
         onStatusChange("Desconectado")
         setDisconnectedState()
       })
@@ -193,6 +224,11 @@ export const useWebSocketChat = ({
     return () => {
       isCancelled = true
       stopPolling()
+      setIsTyping(false)
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+        typingTimeoutRef.current = null
+      }
       socketRef.current?.disconnect()
       socketRef.current = null
     }
@@ -203,13 +239,14 @@ export const useWebSocketChat = ({
     onMessagesUpdate,
     onTranscriptionResult,
     onNoSpeech,
+    onSuggestionsReceived,
     stopPolling,
   ])
 
   const sendMessage = useCallback(
     (text: string) => {
       if (!text.trim() || !isConnected || !conversationId) return
-      socketRef.current?.emit("send_text", { conversationId, text })
+      socketRef.current?.emit("send_text", { conversationId, text, mode: "interview" })
       startPolling()
     },
     [isConnected, conversationId, startPolling],
@@ -225,11 +262,12 @@ export const useWebSocketChat = ({
         conversationId,
         audioBase64: base64Data,
         mimeType: "audio/webm",
+        mode: "interview",
       })
       startPolling()
     },
     [isConnected, conversationId, startPolling],
   )
 
-  return { sendMessage, sendAudioMessage, isConnected }
+  return { sendMessage, sendAudioMessage, isConnected, isTyping }
 }

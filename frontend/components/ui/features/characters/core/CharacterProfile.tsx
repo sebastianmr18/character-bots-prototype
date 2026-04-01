@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
-import type { Character } from '@/types/chat.types'
+import type { Character, Conversation } from '@/types/chat.types'
 import { CharacterContextPanel } from '@/components/ui/features/characters/shared/CharactersContextPanel'
 import ChatInterface, { type ConversationMode } from '@/components/ui/features/characters/modes/chat/ChatMode'
 
@@ -13,7 +13,7 @@ interface CharacterProfileProps {
 
 interface SelectedConversation {
   id: string
-  mode?: 'single' | 'debate'
+  mode?: Conversation['mode']
 }
 
 const getConversationMode = (conversation: SelectedConversation): 'single' | 'debate' =>
@@ -21,7 +21,7 @@ const getConversationMode = (conversation: SelectedConversation): 'single' | 'de
 
 export default function CharacterProfile({ character }: CharacterProfileProps) {
   const router = useRouter()
-  const [activeMode, setActiveMode] = useState<ConversationMode>('chat')
+  const [activeMode, setActiveMode] = useState<ConversationMode>('interview')
   const [lastSingleConversation, setLastSingleConversation] = useState<SelectedConversation | null>(null)
   const [lastDebateConversation, setLastDebateConversation] = useState<SelectedConversation | null>(null)
   const [isInitialHistoryLoaded, setIsInitialHistoryLoaded] = useState(false)
@@ -34,7 +34,7 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
     }
 
     setLastSingleConversation({ id: conversation.id, mode: 'single' })
-    setActiveMode('chat')
+    setActiveMode('interview')
   }, [])
 
   const handleConversationCreated = useCallback((conversation: SelectedConversation) => {
@@ -45,7 +45,7 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
     }
 
     setLastSingleConversation({ id: conversation.id, mode: 'single' })
-    setActiveMode('chat')
+    setActiveMode('interview')
   }, [])
 
   const handleModeChange = useCallback((mode: ConversationMode) => {

@@ -18,6 +18,7 @@ interface ChatInputProps {
   isModalOpen: boolean
   selectedCharacterId: string | null
   canSendMessages?: boolean
+  suggestions?: string[]
   availableCharacters: Array<{ id: string; name: string }>
   onSendMessage: (text: string) => void
   onToggleRecording: () => void
@@ -30,6 +31,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   isModalOpen,
   selectedCharacterId,
   canSendMessages = true,
+  suggestions = [],
   availableCharacters,
   onSendMessage,
   onToggleRecording,
@@ -48,17 +50,24 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     availableCharacters.find((c) => c.id === selectedCharacterId)?.name || "el personaje"
 
   const inputDisabled = isRecording || isModalOpen || !canSendMessages
+  const renderedSuggestions = suggestions.length > 0 ? suggestions : QUICK_SUGGESTIONS
+
+  const handleSuggestionClick = (suggestion: string) => {
+    if (inputDisabled || !isConnected) return
+    onSendMessage(suggestion)
+  }
 
   return (
     <div className="space-y-2">
       {/* Quick suggestions */}
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {QUICK_SUGGESTIONS.map((suggestion) => (
+        {renderedSuggestions.map((suggestion) => (
           <button
             key={suggestion}
             type="button"
-            onClick={() => setInput(suggestion)}
-            className="px-3 py-1.5 rounded-full bg-secondary text-secondary-foreground text-xs whitespace-nowrap hover:bg-secondary/80 transition-colors shrink-0"
+            onClick={() => handleSuggestionClick(suggestion)}
+            disabled={inputDisabled || !isConnected}
+            className="px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20"
           >
             {suggestion}
           </button>

@@ -7,7 +7,7 @@ import { colorFromName, lightColorFromName } from '@/utils/character.utils';
 
 interface CharacterContextPanelProps {
     character: Character;
-    onSelectConversation?: (conversation: { id: string; mode?: 'single' | 'debate' }) => void;
+    onSelectConversation?: (conversation: { id: string; mode?: Conversation['mode'] }) => void;
     selectedConversationId?: string;
     onInitialHistoryLoaded?: () => void;
 }

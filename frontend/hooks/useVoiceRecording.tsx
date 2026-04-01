@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, useCallback } from "react"
+import { useRef, useState, useCallback, useEffect } from "react"
 
 const AUDIO_MIME_TYPE = "audio/webm;codecs=opus"
 
@@ -20,6 +20,26 @@ export const useVoiceRecording = () => {
 
   const [isRecording, setIsRecording] = useState(false)
   const [audioLevel, setAudioLevel] = useState(0)
+
+  const cleanupResources = useCallback(() => {
+    if (animationFrameId.current !== null) {
+      cancelAnimationFrame(animationFrameId.current)
+      animationFrameId.current = null
+    }
+
+    analyser.current = null
+
+    if (mediaRecorder.current) {
+      mediaRecorder.current.ondataavailable = null
+      mediaRecorder.current.onstop = null
+      mediaRecorder.current.stream?.getTracks().forEach((track) => track.stop())
+      mediaRecorder.current = null
+    }
+
+    audioChunks.current = []
+    setIsRecording(false)
+    setAudioLevel(0)
+  }, [])
 
   const startRecording = useCallback(async (): Promise<void> => {
     if (!navigator.mediaDevices) {
@@ -74,19 +94,23 @@ export const useVoiceRecording = () => {
 
         reader.readAsDataURL(audioBlob)
 
-        const stream = mediaRecorder.current?.stream
-        stream?.getTracks().forEach((track) => track.stop())
-
-        if (animationFrameId.current) {
-          cancelAnimationFrame(animationFrameId.current)
-        }
+        cleanupResources()
       }
 
       mediaRecorder.current.stop()
       setIsRecording(false)
       setAudioLevel(0)
     })
-  }, [])
+  }, [cleanupResources])
+
+  useEffect(() => {
+    return () => {
+      if (mediaRecorder.current && mediaRecorder.current.state !== "inactive") {
+        mediaRecorder.current.stop()
+      }
+      cleanupResources()
+    }
+  }, [cleanupResources])
 
   return { isRecording, audioLevel, startRecording, stopRecording }
 }

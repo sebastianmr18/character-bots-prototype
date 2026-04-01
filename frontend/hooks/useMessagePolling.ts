@@ -17,18 +17,31 @@ export const useMessagePolling = (
   onStatusChange: (status: string) => void,
 ) => {
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const isPollingInFlightRef = useRef(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const stopPolling = useCallback(() => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current)
       pollingIntervalRef.current = null
     }
+
+    abortControllerRef.current?.abort()
+    abortControllerRef.current = null
+    isPollingInFlightRef.current = false
   }, [])
 
   const pollOnce = useCallback(async () => {
-    if (!conversationId) return
+    if (!conversationId || isPollingInFlightRef.current) return
+
+    isPollingInFlightRef.current = true
+    abortControllerRef.current?.abort()
+    abortControllerRef.current = new AbortController()
+
     try {
-      const response = await fetch(`/api/conversations/${conversationId}`)
+      const response = await fetch(`/api/conversations/${conversationId}`, {
+        signal: abortControllerRef.current.signal,
+      })
       if (!response.ok) throw new Error('Error al obtener mensajes')
 
       const data = await response.json()
@@ -47,7 +60,12 @@ export const useMessagePolling = (
         onStatusChange('Generando audio...')
       }
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return
+      }
       console.error('Error en polling de mensajes:', error)
+    } finally {
+      isPollingInFlightRef.current = false
     }
   }, [conversationId, onMessagesUpdate, onStatusChange, stopPolling])
 

@@ -19,7 +19,7 @@ export type MessageBlock = TextBlock | ComponentBlock
 
 export interface Message {
   id: number | string
-  role: "user" | "assistant"
+  role: "user" | "assistant" | "system"
   content: string
   schemaVersion?: MessageSchemaVersion
   blocks?: MessageBlock[]
@@ -63,8 +63,13 @@ export interface Conversation {
   characterId?: string
   character: Character
   messages: Message[]
-  mode?: "single" | "debate"
+  mode?: "single" | "debate" | "interview"
   secondaryCharacter?: Character | null
+}
+
+export interface SuggestionsPayload {
+  conversationId: string
+  suggestions: string[]
 }
 
 export interface DebateResponse {
@@ -122,6 +127,8 @@ export interface AiMessagePayload {
   mediaType?: string | null
   media_type?: string | null
   metadata?: Record<string, unknown>
+  suggestions?: string[]
+  suggested_questions?: string[]
 }
 
 export interface StatusDisplayConfig {

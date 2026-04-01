@@ -29,7 +29,7 @@ type BackendMessageBlock = BackendTextBlock | BackendComponentBlock
 
 type BackendMessage = {
   id: number | string
-  role: "user" | "assistant"
+  role: "user" | "assistant" | "system"
   content?: string
   schemaVersion?: MessageSchemaVersion
   schema_version?: MessageSchemaVersion
@@ -281,6 +281,7 @@ export const mergeMessageCollection = (
 export const normalizeAiMessagePayload = (payload: AiMessagePayload): Message => {
   const messageText = payload.text ?? payload.content ?? ""
   const messageId = payload.message_id ?? payload.messageId ?? `ws-${Date.now()}`
+  const suggestions = payload.suggestions ?? payload.suggested_questions
 
   return normalizeBackendMessage({
     id: messageId,
@@ -295,6 +296,9 @@ export const normalizeAiMessagePayload = (payload: AiMessagePayload): Message =>
     audio_url: payload.audio_url,
     mediaType: payload.mediaType,
     media_type: payload.media_type,
-    metadata: payload.metadata,
+    metadata: {
+      ...(payload.metadata ?? {}),
+      ...(suggestions ? { suggestions } : {}),
+    },
   })
 }
