@@ -6,6 +6,7 @@ import { io, Socket } from "socket.io-client"
 import { WS_URL } from "@/constants/chat.constants"
 import type { Message, DebateTurnResultPayload, DebateErrorPayload } from "@/types/chat.types"
 import { base64ToObjectUrl } from "@/utils/live-audio.utils"
+import { mergeMessageCollection } from "@/utils/message.utils"
 import { createClient } from "@/lib/supabase/client"
 
 interface UseDebateWebSocketProps {
@@ -127,7 +128,7 @@ export const useDebateWebSocket = ({
           })
         }
 
-        setMessages((prev) => [...prev, ...newMessages])
+        setMessages((prev) => mergeMessageCollection(prev, newMessages))
       })
 
       socket.on("debate_error", (data: DebateErrorPayload) => {

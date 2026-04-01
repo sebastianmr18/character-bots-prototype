@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import type { Character } from '@/types/chat.types'
@@ -52,6 +52,14 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
     setActiveMode(mode)
   }, [])
 
+  const handleInitialHistoryLoaded = useCallback(() => {
+    setIsInitialHistoryLoaded(true)
+  }, [])
+
+  useEffect(() => {
+    setIsInitialHistoryLoaded(false)
+  }, [character.id])
+
   const selectedConversationId = activeMode === 'debate'
     ? lastDebateConversation?.id
     : lastSingleConversation?.id
@@ -75,7 +83,7 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
             character={character}
             onSelectConversation={handleSelectConversation}
             selectedConversationId={selectedConversationId}
-            onInitialHistoryLoaded={() => setIsInitialHistoryLoaded(true)}
+            onInitialHistoryLoaded={handleInitialHistoryLoaded}
           />
         </div>
 

@@ -25,6 +25,7 @@ export function CharacterContextPanel({
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [isLoadingConversations, setIsLoadingConversations] = useState(true);
     const [avatarImageError, setAvatarImageError] = useState(false);
+    const [hasLoadedInitialHistory, setHasLoadedInitialHistory] = useState(false);
     const [hasNotifiedInitialHistoryLoaded, setHasNotifiedInitialHistoryLoaded] = useState(false);
 
     const fetchConversations = useCallback(async () => {
@@ -37,17 +38,27 @@ export function CharacterContextPanel({
                 (c) => c.character?.id === character.id
             );
             setConversations(forThisCharacter);
+            setHasLoadedInitialHistory(true);
         } catch (err) {
             console.error('Error al cargar conversaciones:', err);
         } finally {
             setIsLoadingConversations(false);
-
-            if (!hasNotifiedInitialHistoryLoaded) {
-                onInitialHistoryLoaded?.();
-                setHasNotifiedInitialHistoryLoaded(true);
-            }
         }
-    }, [character.id, hasNotifiedInitialHistoryLoaded, onInitialHistoryLoaded]);
+    }, [character.id]);
+
+    useEffect(() => {
+        setHasLoadedInitialHistory(false);
+        setHasNotifiedInitialHistoryLoaded(false);
+    }, [character.id]);
+
+    useEffect(() => {
+        if (!hasLoadedInitialHistory || hasNotifiedInitialHistoryLoaded) {
+            return;
+        }
+
+        onInitialHistoryLoaded?.();
+        setHasNotifiedInitialHistoryLoaded(true);
+    }, [hasLoadedInitialHistory, hasNotifiedInitialHistoryLoaded, onInitialHistoryLoaded]);
 
     useEffect(() => {
         fetchConversations();
