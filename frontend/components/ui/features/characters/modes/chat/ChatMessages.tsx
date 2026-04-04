@@ -151,7 +151,10 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
               {charInitial}
             </div>
             <div className="rounded-2xl px-4 py-3 bg-secondary text-secondary-foreground rounded-bl-md">
-              <TypingIndicator />
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">{charName} está pensando</span>
+                <TypingIndicator />
+              </div>
             </div>
           </div>
         </div>

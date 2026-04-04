@@ -49,6 +49,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [isCreatingConversation, setIsCreatingConversation] = useState(false)
   const [dynamicSuggestions, setDynamicSuggestions] = useState<string[]>([])
   const pendingTextQueueRef = useRef<string[]>([])
+  const [isWaitingForResponse, setIsWaitingForResponse] = useState(false)
 
   useEffect(() => {
     setLocalSingleConversationId(singleConversationId)
@@ -147,6 +148,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }, [messages, scrollToBottom])
 
   useEffect(() => {
+    if (!isWaitingForResponse) return
+    const lastMsg = messages[messages.length - 1]
+    if (lastMsg?.role === 'assistant' && (typeof lastMsg.id === 'string' || (typeof lastMsg.id === 'number' && lastMsg.id > 0))) {
+      setIsWaitingForResponse(false)
+    }
+  }, [messages, isWaitingForResponse])
+
+  useEffect(() => {
     setDynamicSuggestions([])
   }, [interviewConversationId])
 
@@ -204,6 +213,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
 
     setMessages((prev) => [...prev, { id: -Date.now(), role: "user", content: text }])
+    setIsWaitingForResponse(true)
 
     if (isConnected && isModeCompatible) {
       sendMessage(text)
@@ -237,6 +247,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             ...prev,
             { id: placeholderId, role: "user", content: "🎤 Enviando audio..." },
           ])
+          setIsWaitingForResponse(true)
           sendAudioMessage(base64Data)
         }
         setShowVoiceModal(false)
@@ -270,6 +281,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   const resolveAudioUrl = useAudioResolver(interviewConversationId, messages, setMessages)
   const showInterviewConversation = Boolean(interviewConversationId && isModeCompatible)
+  const hasOptimisticMessages = messages.some(m => typeof m.id === 'number' && m.id < 0)
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] overflow-hidden border border-border rounded-xl">
@@ -296,14 +308,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <>
           {/* Messages */}
           <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-            {interviewConversationId && isLoading ? (
+            {interviewConversationId && isLoading && !hasOptimisticMessages ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-8">
                 <h3 className="text-base font-semibold mb-1 text-foreground">Cargando conversación</h3>
                 <p className="text-sm text-muted-foreground max-w-xs">
                   Verificando el historial y el tipo de conversación seleccionado.
                 </p>
               </div>
-            ) : showInterviewConversation ? (
+            ) : (showInterviewConversation || hasOptimisticMessages) ? (
               <ChatMessages
                 messages={messages}
                 availableCharacters={effectiveAvailableCharacters}
@@ -312,7 +324,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 messagesEndRef={messagesEndRef}
                 resolveAudioUrl={resolveAudioUrl}
                 characterName={effectiveCharacterName}
-                isTyping={isTyping}
+                isTyping={isTyping || isWaitingForResponse}
               />
             ) : interviewConversationId && !isLoading ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-8">

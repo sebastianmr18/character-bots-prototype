@@ -20,7 +20,7 @@ export const DebatePanel: React.FC<DebatePanelProps> = ({
   existingConversationId = null,
   onConversationCreated,
 }) => {
-  const { availableCharacters } = useCharacters()
+  const { availableCharacters, isLoading: isLoadingCharacters } = useCharacters()
   const [debateConvId, setDebateConvId] = useState<string | null>(null)
   const [characterA, setCharacterA] = useState<Character | null>(null)
   const [characterB, setCharacterB] = useState<Character | null>(null)
@@ -132,6 +132,7 @@ export const DebatePanel: React.FC<DebatePanelProps> = ({
         characters={availableCharacters}
         onConfirm={handleConfirmDebate}
         isLoading={isCreating}
+        isLoadingCharacters={isLoadingCharacters}
       />
       {createError && (
         <div className="px-4 py-2 bg-destructive/10 border-t border-destructive/20">
