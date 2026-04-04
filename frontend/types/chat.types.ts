@@ -72,26 +72,57 @@ export interface SuggestionsPayload {
   suggestions: string[]
 }
 
-export interface DebateResponse {
-  message_id: number | string
-  text: string
-  speaker_id: string
-  speaker_name: string
-  audio?: string | null
-  warning?: {
-    code: string
-    message: string
-    stage: string
-    retryable: boolean
-  } | null
+export type DebateTurnOrder = "A" | "B"
+
+export interface DebateWarningPayload {
+  code: string
+  message: string
+  stage: string
+  retryable: boolean
 }
 
-export interface DebateTurnResultPayload {
+export interface DebateMessageMetadata extends Record<string, unknown> {
+  debateTraceId?: string
+  turnOrder?: DebateTurnOrder | null
+  warning?: DebateWarningPayload | null
+}
+
+export interface DebateStartedPayload {
+  conversationId: string
+  traceId: string
+}
+
+export interface DebateUserAckPayload {
   conversationId: string
   traceId: string
   user_message_id: number | string
   user_text: string
-  responses: DebateResponse[]
+}
+
+export interface DebateTypingPayload {
+  conversationId: string
+  traceId: string
+  speaker_id: string
+  speaker_name: string
+  turn_order: DebateTurnOrder
+}
+
+export interface DebateTurnPayload {
+  conversationId: string
+  traceId: string
+  message_id: number | string
+  text: string
+  speaker_id: string
+  speaker_name: string
+  turn_order: DebateTurnOrder
+  audio?: string | null
+  warning?: DebateWarningPayload | null
+}
+
+export interface DebateRoundCompletePayload {
+  conversationId: string
+  traceId: string
+  warnings?: DebateWarningPayload[]
 }
 
 export interface DebateErrorPayload {

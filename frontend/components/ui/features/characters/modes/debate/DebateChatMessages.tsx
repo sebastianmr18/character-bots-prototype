@@ -1,14 +1,16 @@
 "use client"
 
 import type React from "react"
-import type { Message, Character } from "@/types/chat.types"
+import type { Character, DebateMessageMetadata, DebateWarningPayload, Message } from "@/types/chat.types"
 import { AudioMessagePlayer } from "@/components/ui/features/characters/shared/AudioMessagePlayer"
+import { TypingIndicator } from "@/components/ui/features/characters/modes/chat/TypingIndicator"
 import { colorFromName, lightColorFromName } from "@/utils/character.utils"
 
 interface DebateChatMessagesProps {
   messages: Message[]
   characterA: Character
   characterB: Character
+  typingCharacterId: string | null
   messagesEndRef: React.RefObject<HTMLDivElement | null>
 }
 
@@ -27,8 +29,16 @@ export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
   messages,
   characterA,
   characterB,
+  typingCharacterId,
   messagesEndRef,
 }) => {
+  const typingSpeaker =
+    typingCharacterId === characterA.id
+      ? characterA
+      : typingCharacterId === characterB.id
+        ? characterB
+        : null
+
   return (
     <>
       {messages.map((message) => {
@@ -50,8 +60,9 @@ export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
         const themeColor = getThemeColor(speaker)
         const themeColorLight = getThemeColorLight(speaker)
 
-        const warning = message.metadata?.warning as
-          | { code: string; message: string } | null
+        const warning = (message.metadata as DebateMessageMetadata | undefined)?.warning as
+          | DebateWarningPayload
+          | null
           | undefined
 
         return (
@@ -91,14 +102,48 @@ export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
               </div>
 
               {warning && (
-                <p className="text-xs text-muted-foreground mt-1 px-1">
-                  ⚠ Audio no disponible
-                </p>
+                <div className="mt-2 px-1">
+                  <p className="text-xs font-medium text-foreground/75">Advertencia: {warning.message}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {warning.code} · etapa {warning.stage}
+                  </p>
+                </div>
               )}
             </div>
           </div>
         )
       })}
+
+      {typingSpeaker && (
+        <div className={`flex ${typingSpeaker.id === characterA.id ? "justify-start" : "justify-end"}`}>
+          <div className="max-w-[70%]">
+            <div
+              className={`flex items-center gap-1.5 mb-1 ${typingSpeaker.id === characterA.id ? "flex-row" : "flex-row-reverse"}`}
+            >
+              <div
+                className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                style={{ backgroundColor: getThemeColor(typingSpeaker) }}
+              >
+                {getShortName(typingSpeaker)[0]}
+              </div>
+              <span className="text-xs font-medium text-foreground/70">
+                {getShortName(typingSpeaker)}
+              </span>
+            </div>
+
+            <div
+              className={`rounded-2xl px-4 py-3 ${typingSpeaker.id === characterA.id ? "rounded-bl-md" : "rounded-br-md"}`}
+              style={{ backgroundColor: getThemeColorLight(typingSpeaker) }}
+            >
+              <div className="flex items-center gap-2 text-foreground/70">
+                <span className="text-xs">{getShortName(typingSpeaker)} está pensando</span>
+                <TypingIndicator />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div ref={messagesEndRef} />
     </>
   )

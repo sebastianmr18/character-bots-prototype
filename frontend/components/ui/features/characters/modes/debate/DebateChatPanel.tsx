@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { StatusIndicator } from "@/components/ui/features/characters/shared/StatusIndicator"
 import { DebateChatMessages } from "@/components/ui/features/characters/modes/debate/DebateChatMessages"
 import { useDebateWebSocket } from "@/hooks/useDebateWebSocket"
-import type { Character } from "@/types/chat.types"
+import type { Character, Message } from "@/types/chat.types"
 import { normalizeBackendMessages } from "@/utils/message.utils"
 import { colorFromName } from "@/utils/character.utils"
 
@@ -36,27 +36,52 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const { messages, setMessages, sendDebateMessage, isConnected, isSending, errorMessage } =
-    useDebateWebSocket({ conversationId, onStatusChange: setStatus })
+  const loadHistory = useCallback(async (): Promise<Message[] | null> => {
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}`)
+      if (!response.ok) return null
+
+      const data = await response.json()
+      return normalizeBackendMessages(data.messages ?? [])
+    } catch {
+      return null
+    }
+  }, [conversationId])
+
+  const {
+    messages,
+    setMessages,
+    sendDebateMessage,
+    retryLastMessage,
+    isConnected,
+    isSending,
+    errorState,
+    typingCharacterId,
+    canRetry,
+  } = useDebateWebSocket({
+    conversationId,
+    onStatusChange: setStatus,
+    fetchConversationMessages: loadHistory,
+  })
 
   // Load history whenever conversation changes.
   useEffect(() => {
+    let isMounted = true
     setMessages([])
 
-    const loadHistory = async () => {
-      try {
-        const response = await fetch(`/api/conversations/${conversationId}`)
-        if (!response.ok) return
-        const data = await response.json()
-        const historical = normalizeBackendMessages(data.messages ?? [])
+    const syncHistory = async () => {
+      const historical = await loadHistory()
+      if (historical && isMounted) {
         setMessages(historical)
-      } catch {
-        // non-critical; debate continues without history
       }
     }
 
-    loadHistory()
-  }, [conversationId, setMessages])
+    void syncHistory()
+
+    return () => {
+      isMounted = false
+    }
+  }, [conversationId, loadHistory, setMessages])
 
   // Auto-scroll on new messages
   const scrollToBottom = useCallback(() => {
@@ -73,6 +98,10 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
     if (!inputValue.trim() || !isConnected || isSending) return
     sendDebateMessage(inputValue.trim())
     setInputValue("")
+  }
+
+  const handleRetry = () => {
+    void retryLastMessage()
   }
 
   const colorA = getThemeColor(characterA)
@@ -140,14 +169,34 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
           messages={messages}
           characterA={characterA}
           characterB={characterB}
+          typingCharacterId={typingCharacterId}
           messagesEndRef={messagesEndRef}
         />
       </div>
 
       {/* Error */}
-      {errorMessage && (
-        <div className="px-4 py-2 bg-destructive/10 border-t border-destructive/20 shrink-0">
-          <p className="text-sm text-destructive text-center">{errorMessage}</p>
+      {errorState && (
+        <div className="px-4 py-3 bg-destructive/10 border-t border-destructive/20 shrink-0">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-destructive">{errorState.message}</p>
+              <p className="text-xs text-destructive/80 mt-1">
+                Código: {errorState.code} · Etapa: {errorState.stage}
+              </p>
+            </div>
+            {canRetry && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleRetry}
+                disabled={!isConnected || isSending}
+                className="border-destructive/30 bg-background text-destructive hover:bg-destructive/5"
+              >
+                Reintentar ronda
+              </Button>
+            )}
+          </div>
         </div>
       )}
 

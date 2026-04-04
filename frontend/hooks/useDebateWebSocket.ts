@@ -4,31 +4,168 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import { io, Socket } from "socket.io-client"
 import { WS_URL } from "@/constants/chat.constants"
-import type { Message, DebateTurnResultPayload, DebateErrorPayload } from "@/types/chat.types"
+import type {
+  DebateErrorPayload,
+  DebateMessageMetadata,
+  DebateRoundCompletePayload,
+  DebateStartedPayload,
+  DebateTurnPayload,
+  DebateTypingPayload,
+  DebateUserAckPayload,
+  Message,
+} from "@/types/chat.types"
 import { base64ToObjectUrl } from "@/utils/live-audio.utils"
-import { mergeMessageCollection } from "@/utils/message.utils"
 import { createClient } from "@/lib/supabase/client"
 
 interface UseDebateWebSocketProps {
   conversationId: string | null
   onStatusChange: (status: string) => void
+  fetchConversationMessages?: () => Promise<Message[] | null>
+}
+
+const asDebateMetadata = (message: Message): DebateMessageMetadata | undefined => {
+  if (!message.metadata) return undefined
+  return message.metadata as DebateMessageMetadata
+}
+
+const upsertMessagesById = (prev: Message[], incomingMessages: Message[]): Message[] => {
+  if (incomingMessages.length === 0) return prev
+
+  const next = [...prev]
+  let didChange = false
+
+  incomingMessages.forEach((incoming) => {
+    const existingIndex = next.findIndex(
+      (message) => String(message.id) === String(incoming.id),
+    )
+
+    if (existingIndex >= 0) {
+      next[existingIndex] = {
+        ...next[existingIndex],
+        ...incoming,
+        metadata: incoming.metadata ?? next[existingIndex].metadata,
+      }
+      didChange = true
+      return
+    }
+
+    next.push(incoming)
+    didChange = true
+  })
+
+  return didChange ? next : prev
+}
+
+const removeMessagesByTraceId = (prev: Message[], traceId: string): Message[] => {
+  const next = prev.filter((message) => asDebateMetadata(message)?.debateTraceId !== traceId)
+  return next.length === prev.length ? prev : next
+}
+
+const createTraceScopedMessage = (
+  message: Message,
+  traceId: string,
+  metadata: Omit<DebateMessageMetadata, "debateTraceId"> = {},
+): Message => ({
+  ...message,
+  metadata: {
+    ...(message.metadata ?? {}),
+    ...metadata,
+    debateTraceId: traceId,
+  },
+})
+
+const buildTurnMessage = (payload: DebateTurnPayload): Message => {
+  let audioUrl: string | null = null
+
+  if (payload.audio) {
+    try {
+      audioUrl = base64ToObjectUrl(payload.audio, "audio/mpeg")
+    } catch {
+      audioUrl = null
+    }
+  }
+
+  return createTraceScopedMessage(
+    {
+      id: payload.message_id,
+      role: "assistant",
+      content: payload.text,
+      speakerId: payload.speaker_id,
+      speakerName: payload.speaker_name,
+      audioUrl,
+      mediaType: audioUrl ? "audio/mpeg" : null,
+    },
+    payload.traceId,
+    {
+      turnOrder: payload.turn_order,
+      warning: payload.warning ?? null,
+    },
+  )
 }
 
 export const useDebateWebSocket = ({
   conversationId,
   onStatusChange,
+  fetchConversationMessages,
 }: UseDebateWebSocketProps) => {
   const socketRef = useRef<Socket | null>(null)
+  const hasConnectedRef = useRef(false)
+  const activeRoundTraceIdRef = useRef<string | null>(null)
+  const activeRoundTextRef = useRef<string | null>(null)
+  const lastSubmittedTextRef = useRef<string | null>(null)
+  const lastRetryableTextRef = useRef<string | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [isSending, setIsSending] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [errorState, setErrorState] = useState<DebateErrorPayload | null>(null)
+  const [typingCharacterId, setTypingCharacterId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
+
+  const reconcileHistory = useCallback(async () => {
+    if (!fetchConversationMessages) return
+
+    const historicalMessages = await fetchConversationMessages()
+    if (historicalMessages) {
+      setMessages(historicalMessages)
+    }
+  }, [fetchConversationMessages])
+
+  const clearRoundState = useCallback((clearRetryText = false) => {
+    activeRoundTraceIdRef.current = null
+    activeRoundTextRef.current = null
+    setTypingCharacterId(null)
+    setIsSending(false)
+
+    if (clearRetryText) {
+      lastRetryableTextRef.current = null
+    }
+  }, [])
+
+  const emitDebateMessage = useCallback(
+    (text: string) => {
+      const trimmedText = text.trim()
+      if (!trimmedText || !socketRef.current || !isConnected || !conversationId || isSending) {
+        return false
+      }
+
+      activeRoundTraceIdRef.current = null
+      activeRoundTextRef.current = trimmedText
+      lastSubmittedTextRef.current = trimmedText
+      setErrorState(null)
+      setTypingCharacterId(null)
+      setIsSending(true)
+      onStatusChange("Esperando confirmación...")
+      socketRef.current.emit("send_debate_text", { conversationId, text: trimmedText })
+      return true
+    },
+    [conversationId, isConnected, isSending, onStatusChange],
+  )
 
   useEffect(() => {
     setMessages([])
-    setErrorMessage(null)
-    setIsSending(false)
-  }, [conversationId])
+    setErrorState(null)
+    setTypingCharacterId(null)
+    clearRoundState(true)
+  }, [clearRoundState, conversationId])
 
   useEffect(() => {
     if (!conversationId) return
@@ -52,10 +189,15 @@ export const useDebateWebSocket = ({
       if (!socket) return
 
       socket.on("connect", () => {
+        const isReconnect = hasConnectedRef.current
+        hasConnectedRef.current = true
         onStatusChange("Conectado")
         setIsConnected(true)
-        setErrorMessage(null)
         socket?.emit("join_debate", conversationId)
+
+        if (isReconnect) {
+          void reconcileHistory()
+        }
       })
 
       socket.on("connect_error", async (error: any) => {
@@ -89,56 +231,90 @@ export const useDebateWebSocket = ({
         setIsConnected(false)
       })
 
-      socket.on("debate_started", () => {
-        onStatusChange("Listo")
+      socket.on("debate_started", (data: DebateStartedPayload) => {
+        if (data.conversationId !== conversationId) return
+        activeRoundTraceIdRef.current = data.traceId
+        onStatusChange("Esperando respuestas...")
       })
 
-      socket.on("debate_turn_result", (data: DebateTurnResultPayload) => {
-        setIsSending(false)
-        onStatusChange("Listo")
+      socket.on("debate_user_ack", (data: DebateUserAckPayload) => {
+        if (data.conversationId !== conversationId) return
 
-        const newMessages: Message[] = []
+        activeRoundTraceIdRef.current = data.traceId
+        setErrorState(null)
+        onStatusChange("Esperando respuestas...")
+        setMessages((prev) =>
+          upsertMessagesById(prev, [
+            createTraceScopedMessage(
+              {
+                id: data.user_message_id,
+                role: "user",
+                content: data.user_text,
+              },
+              data.traceId,
+              {
+                turnOrder: null,
+                warning: null,
+              },
+            ),
+          ]),
+        )
+      })
 
-        // User message
-        newMessages.push({
-          id: data.user_message_id,
-          role: "user",
-          content: data.user_text,
-        })
+      socket.on("debate_typing", (data: DebateTypingPayload) => {
+        if (data.conversationId !== conversationId) return
 
-        // Character responses
-        for (const response of data.responses) {
-          let audioUrl: string | null = null
-          if (response.audio) {
-            try {
-              audioUrl = base64ToObjectUrl(response.audio, "audio/mpeg")
-            } catch {
-              // audio unavailable; text still displayed
-            }
-          }
-          newMessages.push({
-            id: response.message_id,
-            role: "assistant",
-            content: response.text,
-            speakerId: response.speaker_id,
-            speakerName: response.speaker_name,
-            audioUrl,
-            mediaType: audioUrl ? "audio/mpeg" : null,
-            metadata: response.warning ? { warning: response.warning } : undefined,
-          })
+        activeRoundTraceIdRef.current = data.traceId
+        setTypingCharacterId(data.speaker_id)
+        onStatusChange(`${data.speaker_name} está pensando...`)
+      })
+
+      socket.on("debate_turn", (data: DebateTurnPayload) => {
+        if (data.conversationId !== conversationId) return
+
+        activeRoundTraceIdRef.current = data.traceId
+        setTypingCharacterId(null)
+        setMessages((prev) => upsertMessagesById(prev, [buildTurnMessage(data)]))
+
+        if (data.turn_order === "A") {
+          onStatusChange("Esperando siguiente respuesta...")
+          return
         }
 
-        setMessages((prev) => mergeMessageCollection(prev, newMessages))
+        onStatusChange("Cerrando ronda...")
+      })
+
+      socket.on("debate_round_complete", (data: DebateRoundCompletePayload) => {
+        if (data.conversationId !== conversationId) return
+
+        clearRoundState(true)
+        setErrorState(null)
+        onStatusChange("Listo")
+        void reconcileHistory()
       })
 
       socket.on("debate_error", (data: DebateErrorPayload) => {
-        setIsSending(false)
+        const failedTraceId = activeRoundTraceIdRef.current ?? data.traceId
+        const failedText = activeRoundTextRef.current ?? lastSubmittedTextRef.current
+
+        if (failedTraceId) {
+          setMessages((prev) => removeMessagesByTraceId(prev, failedTraceId))
+        }
+
+        if (data.retryable && failedText) {
+          lastRetryableTextRef.current = failedText
+        } else {
+          lastRetryableTextRef.current = null
+        }
+
+        clearRoundState(false)
         onStatusChange("Error")
-        setErrorMessage(data.message)
+        setErrorState(data)
         console.error("Debate error:", data)
       })
 
       socket.on("disconnect", () => {
+        clearRoundState(false)
         onStatusChange("Desconectado")
         setIsConnected(false)
       })
@@ -171,18 +347,30 @@ export const useDebateWebSocket = ({
       socketRef.current?.disconnect()
       socketRef.current = null
     }
-  }, [conversationId, onStatusChange])
+  }, [clearRoundState, conversationId, onStatusChange, reconcileHistory])
 
   const sendDebateMessage = useCallback(
     (text: string) => {
-      if (!text.trim() || !isConnected || !conversationId) return
-      setIsSending(true)
-      setErrorMessage(null)
-      onStatusChange("Debatiendo...")
-      socketRef.current?.emit("send_debate_text", { conversationId, text })
+      void emitDebateMessage(text)
     },
-    [isConnected, conversationId, onStatusChange],
+    [emitDebateMessage],
   )
 
-  return { messages, setMessages, sendDebateMessage, isConnected, isSending, errorMessage }
+  const retryLastMessage = useCallback(() => {
+    const retryText = lastRetryableTextRef.current
+    if (!retryText || !errorState?.retryable) return false
+    return emitDebateMessage(retryText)
+  }, [emitDebateMessage, errorState?.retryable])
+
+  return {
+    messages,
+    setMessages,
+    sendDebateMessage,
+    retryLastMessage,
+    isConnected,
+    isSending,
+    errorState,
+    typingCharacterId,
+    canRetry: Boolean(errorState?.retryable && lastRetryableTextRef.current),
+  }
 }
