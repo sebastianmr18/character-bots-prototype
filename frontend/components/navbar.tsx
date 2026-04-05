@@ -46,7 +46,7 @@ export function Navbar({ transparent = false }: NavbarProps) {
 
             <div className="hidden md:flex items-center gap-8">
               <Link
-                href="/chats"
+                href="/personajes"
                 className="text-sm font-medium text-foreground/80 hover:text-foreground transition-colors"
               >
                 Personajes
@@ -117,7 +117,7 @@ export function Navbar({ transparent = false }: NavbarProps) {
                   Hola, <span className="font-semibold">{userDisplayName}</span>
                 </p>
                 <Link
-                  href="/chats"
+                  href="/personajes"
                   className="text-sm font-medium text-foreground/80 hover:text-foreground transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >

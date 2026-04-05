@@ -13,6 +13,15 @@ import { ChatInput } from "@/components/ui/features/characters/modes/chat/ChatIn
 import { ChatMessages } from "@/components/ui/features/characters/modes/chat/ChatMessages"
 import { MessageSquareMore, Phone, Swords, GraduationCap } from "lucide-react"
 import { getErrorMessage } from "@/utils/api.utils"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 
 export type ConversationMode = "call" | "interview" | "debate" | "professor"
 
@@ -131,7 +140,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
-  const { isRecording, audioLevel, startRecording, stopRecording } = useVoiceRecording()
+  const { isRecording, audioLevel, startRecording, stopRecording, errorMessage, clearError } = useVoiceRecording()
 
   const scrollToBottom = useCallback(() => {
     const container = messagesContainerRef.current
@@ -252,7 +261,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         }
         setShowVoiceModal(false)
       } else {
-        await startRecording()
+        const didStartRecording = await startRecording()
+        if (!didStartRecording) {
+          setShowVoiceModal(false)
+          return
+        }
+
         setStatus("Grabando voz...")
         setShowVoiceModal(true)
       }
@@ -378,12 +392,24 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       )}
 
       <VoiceRecordingModal
-        isOpen={showVoiceModal}
+        isOpen={showVoiceModal && !errorMessage}
         onToggleRecording={handleToggleRecording}
         isRecording={isRecording}
         audioLevel={audioLevel}
         onClose={handleCloseVoiceModal}
       />
+
+      <Dialog open={!!errorMessage} onOpenChange={(open) => { if (!open) clearError() }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Error de audio</DialogTitle>
+            <DialogDescription>{errorMessage}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={clearError}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

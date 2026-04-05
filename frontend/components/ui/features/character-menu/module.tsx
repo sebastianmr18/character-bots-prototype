@@ -2,30 +2,13 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { ChatListItem } from '@/components/ui/features/character-menu/ChatListItem'
-import { CreateCharacterModal } from '@/components/ui/features/character-menu/CreateCharacterModal'
-import type { Character, Conversation } from '@/types/chat.types'
-import { getErrorMessage } from '@/utils/api.utils'
-import { ArrowLeft, Sparkles, MessageSquare } from 'lucide-react'
+import type { Character } from '@/types/chat.types'
+import { MessageSquare } from 'lucide-react'
 import { toSlug, colorFromName, lightColorFromName } from '@/utils/character.utils'
 
 export default function ChatsConversationsPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [creatingCharacterId, setCreatingCharacterId] = useState<string | null>(null)
-  const [deletingConversationId, setDeletingConversationId] = useState<string | null>(null)
-  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null)
-  const [operationError, setOperationError] = useState<string | null>(null)
   const [characters, setCharacters] = useState<Character[]>([])
 
   const fetchAllData = useCallback(async () => {
@@ -46,103 +29,21 @@ export default function ChatsConversationsPage() {
     }
   }, [])
 
-  // 1. Carga de datos
   useEffect(() => {
     fetchAllData()
   }, [fetchAllData])
-
-  const handleConversationSelect = useCallback((conversationId: string) => {
-    router.push(`/chats/${conversationId}`)
-  }, [router])
 
   const handleCharacterClick = useCallback((characterName: string) => {
     router.push(`/personajes/${toSlug(characterName)}`)
   }, [router])
 
-  const handleNewConversation = useCallback(async (characterId: string) => {
-    try {
-      setOperationError(null)
-      setCreatingCharacterId(characterId)
-
-      const response = await fetch('/api/conversations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ characterId }),
-      })
-
-      if (!response.ok) {
-        const message = await getErrorMessage(response)
-        throw new Error(message)
-      }
-
-      const newConversation: Conversation = await response.json()
-      const newConversationId = newConversation?.id
-
-      if (!newConversationId) {
-        throw new Error('No se recibió el id de la conversación')
-      }
-
-      window.dispatchEvent(
-        new CustomEvent('conversation:created', {
-          detail: { id: newConversationId, mode: 'single' },
-        }),
-      )
-
-      await fetchAllData()
-      router.push(`/chats/${newConversationId}`)
-    } catch (error) {
-      console.error('Error al crear nueva conversación:', error)
-      const message = error instanceof Error ? error.message : 'Error al iniciar nuevo chat'
-      setOperationError(message)
-    } finally {
-      setCreatingCharacterId(null)
-    }
-  }, [fetchAllData, router])
-
-  const handleDeleteConversation = useCallback((conversationId: string) => {
-    setOperationError(null)
-    setConversationToDelete(conversationId)
-  }, [])
-
-  const confirmDeleteConversation = useCallback(async () => {
-    if (!conversationToDelete) return
-
-    try {
-      setOperationError(null)
-      setDeletingConversationId(conversationToDelete)
-
-      const response = await fetch(`/api/conversations/${conversationToDelete}`, {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) {
-        const message = await getErrorMessage(response)
-        throw new Error(message)
-      }
-
-      await fetchAllData()
-    } catch (error) {
-      console.error('Error al eliminar conversación:', error)
-      const message = error instanceof Error ? error.message : 'Error al eliminar la conversación'
-      setOperationError(message)
-    } finally {
-      setConversationToDelete(null)
-      setDeletingConversationId(null)
-    }
-  }, [conversationToDelete, fetchAllData])
-
-  // 3. Renderizado
   if (loading) {
     return (
       <main className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-gray-600 dark:text-gray-400 animate-pulse text-xl">Cargando personajes... ⏳</p>
+        <p className="text-gray-600 dark:text-gray-400 animate-pulse text-xl">Cargando personajes...</p>
       </main>
     )
   }
-
-  const allCharacters = characters
 
   return (
     <main className="min-h-screen bg-background">
@@ -157,22 +58,15 @@ export default function ChatsConversationsPage() {
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Explora nuestra coleccion de personajes historicos y ficticios
             </p>
-            {/*<CreateCharacterModal onCharacterCreated={fetchAllData} />*/}
           </div>
         </div>
       </div>
 
-      {/* --- Characters Grouped List --- */}
+      {/* --- Characters Grid --- */}
       <div className="max-w-7xl mx-auto px-4 py-12">
-        {operationError && (
-          <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
-            {operationError}
-          </div>
-        )}
-
-        {allCharacters.length > 0 ? (
+        {characters.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {allCharacters.map((character) => (
+            {characters.map((character) => (
               <div
                 key={character.id}
                 className="group relative rounded-lg overflow-hidden bg-card border border-border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
@@ -182,7 +76,6 @@ export default function ChatsConversationsPage() {
                   '--character-color-light': character.themeColorLight ?? lightColorFromName(character.name),
                 } as React.CSSProperties}
               >
-                {/* Header: imagen del personaje o placeholder con SVG + inicial */}
                 <div className="h-80 relative overflow-hidden">
                   {character.imageUrl ? (
                     <img
@@ -194,7 +87,6 @@ export default function ChatsConversationsPage() {
                       }}
                     />
                   ) : null}
-                  {/* Placeholder: siempre presente debajo; visible si no hay imagen o falla la carga */}
                   <div className="absolute inset-0 opacity-20">
                     <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
                       <pattern id={`pattern-${character.id}`} patternUnits="userSpaceOnUse" width="20" height="20">
@@ -227,35 +119,7 @@ export default function ChatsConversationsPage() {
                     </span>
                     <span>{character.biography && character.biography.length > 60 ? character.biography.slice(0, 60) + "…" : character.biography}</span>
                   </div>
-                  {/* TODO: Recolocar el botón de iniciar una neuva charla. */}
-                  {/*<Button 
-                        onClick={() => handleNewConversation(character.id)}
-                      disabled={creatingCharacterId === character.id}
-                        className="mt-3 sm:mt-0 bg-green-600 hover:bg-green-700 text-white font-semibold"
-                    >
-                      {creatingCharacterId === character.id ? 'Creando...' : '+ Iniciar Nueva Charla'}
-                    </Button>*/}
                 </div>
-
-                {/* Lista de Conversaciones */}
-                {/*<div className="space-y-3">
-                  {chats.length > 0 ? (
-                    chats.map((conversation) => (
-                      <ChatListItem // 🔑 Reemplazo del div por el componente
-                        key={conversation.id}
-                        conversation={conversation}
-                        onClick={handleConversationSelect}
-                        onDelete={handleDeleteConversation}
-                        isDeleting={deletingConversationId === conversation.id}
-                      />
-                    ))
-                  ) : (
-                    // ... (Mensaje de sin chats) ...
-                    <div className="text-center py-4 bg-gray-50 dark:bg-gray-700/50 rounded-md">
-                      <p className="text-gray-500 dark:text-gray-400">No hay chats guardados con **{character.name}**. ¡Comienza uno!</p>
-                    </div>
-                  )}
-                </div>*/}
               </div>
             ))}
           </div>
@@ -267,34 +131,6 @@ export default function ChatsConversationsPage() {
           </div>
         )}
       </div>
-
-      <AlertDialog
-        open={conversationToDelete !== null}
-        onOpenChange={(open) => {
-          if (!open) setConversationToDelete(null)
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar conversación?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletingConversationId !== null}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDeleteConversation}
-              disabled={deletingConversationId !== null}
-              className="bg-red-600 text-white hover:bg-red-700"
-            >
-              {deletingConversationId !== null ? 'Eliminando...' : 'Eliminar'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </main>
   )
 }

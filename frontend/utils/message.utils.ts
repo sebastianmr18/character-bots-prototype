@@ -152,7 +152,7 @@ const blocksToTextFallback = (blocks: MessageBlock[] | undefined): string => {
     .trim()
 }
 
-export const normalizeBackendMessage = (message: BackendMessage): Message => {
+const normalizeBackendMessage = (message: BackendMessage): Message => {
   const normalizedBlocks = normalizeBackendBlocks(message.blocks)
 
   return {

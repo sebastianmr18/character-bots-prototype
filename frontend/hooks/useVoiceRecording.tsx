@@ -20,6 +20,9 @@ export const useVoiceRecording = () => {
 
   const [isRecording, setIsRecording] = useState(false)
   const [audioLevel, setAudioLevel] = useState(0)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const clearError = useCallback(() => setErrorMessage(null), [])
 
   const cleanupResources = useCallback(() => {
     if (animationFrameId.current !== null) {
@@ -41,10 +44,10 @@ export const useVoiceRecording = () => {
     setAudioLevel(0)
   }, [])
 
-  const startRecording = useCallback(async (): Promise<void> => {
+  const startRecording = useCallback(async (): Promise<boolean> => {
     if (!navigator.mediaDevices) {
-      alert("Tu navegador no soporta grabación de audio.")
-      return
+      setErrorMessage("Tu navegador no soporta grabación de audio.")
+      return false
     }
 
     try {
@@ -69,9 +72,11 @@ export const useVoiceRecording = () => {
         animationFrameId.current = requestAnimationFrame(updateLevel)
       }
       updateLevel()
+      return true
     } catch (err) {
       console.error("Error al acceder al micrófono:", err)
-      alert("Necesitas dar permiso al micrófono o usar un navegador compatible con audio/webm;codecs=opus.")
+      setErrorMessage("Necesitas dar permiso al micrófono o usar un navegador compatible con audio/webm;codecs=opus.")
+      return false
     }
   }, [])
 
@@ -112,5 +117,5 @@ export const useVoiceRecording = () => {
     }
   }, [cleanupResources])
 
-  return { isRecording, audioLevel, startRecording, stopRecording }
+  return { isRecording, audioLevel, startRecording, stopRecording, errorMessage, clearError }
 }
