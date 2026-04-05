@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import type { Character, Conversation } from '@/types/chat.types'
 import { CharacterContextPanel } from '@/components/ui/features/characters/shared/CharactersContextPanel'
+import { CharacterConversationHistory } from '../shared/CharacterConversationHistory'
 import ChatInterface, { type ConversationMode } from '@/components/ui/features/characters/modes/chat/ChatMode'
 
 interface CharacterProfileProps {
@@ -77,18 +78,15 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
       </nav>
 
       <div className="flex flex-col lg:flex-row flex-1">
-        {/* Left Panel - Character Context (60%) */}
-        <div className="lg:w-[60%] border-r border-border overflow-hidden flex flex-col">
+        {/* Left Panel - Character Context (30%) */}
+        <div className="lg:w-[30%] border-r border-border overflow-hidden flex flex-col">
           <CharacterContextPanel
             character={character}
-            onSelectConversation={handleSelectConversation}
-            selectedConversationId={selectedConversationId}
-            onInitialHistoryLoaded={handleInitialHistoryLoaded}
           />
         </div>
 
-        {/* Right Panel - Conversation (40%) */}
-        <div className="lg:w-[40%] flex flex-col relative min-h-0 overflow-hidden">
+        {/* Center Panel - Conversation (55%) */}
+        <div className="lg:w-[50%] flex flex-col relative min-h-0 overflow-hidden">
           <div className="flex-1 min-h-0 p-4">
             <ChatInterface
               activeMode={activeMode}
@@ -101,6 +99,14 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
               onConversationCreated={handleConversationCreated}
             />
           </div>
+        </div>
+        <div className="lg:w-[20%] flex flex-col relative min-h0 overflow-hidden">
+          <CharacterConversationHistory
+            character={character}
+            onSelectConversation={handleSelectConversation}
+            selectedConversationId={selectedConversationId}
+            onInitialHistoryLoaded={handleInitialHistoryLoaded}
+          />
         </div>
       </div>
     </main>

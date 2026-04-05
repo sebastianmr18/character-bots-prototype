@@ -1,79 +1,22 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { MessageSquare, Clock, Loader2 } from 'lucide-react';
-import type { Character, Conversation } from '@/types/chat.types';
+import { useEffect, useState } from 'react';
+import { MessageSquare } from 'lucide-react';
+import type { Character } from '@/types/chat.types';
 import { colorFromName, lightColorFromName } from '@/utils/character.utils';
 
 interface CharacterContextPanelProps {
     character: Character;
-    onSelectConversation?: (conversation: { id: string; mode?: Conversation['mode'] }) => void;
-    selectedConversationId?: string;
-    onInitialHistoryLoaded?: () => void;
 }
 
 export function CharacterContextPanel({
     character,
-    onSelectConversation,
-    selectedConversationId,
-    onInitialHistoryLoaded,
 }: CharacterContextPanelProps) {
     const themeColor = character.themeColor ?? colorFromName(character.name)
     const themeColorLight = character.themeColorLight ?? lightColorFromName(character.name)
     const characterImageUrl = character.imageUrl ?? (character as Character & { image_url?: string | null }).image_url ?? null;
     const backgroundImageUrl = character.backgroundImageUrl ?? null;
-    const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [isLoadingConversations, setIsLoadingConversations] = useState(true);
     const [avatarImageError, setAvatarImageError] = useState(false);
-    const [hasLoadedInitialHistory, setHasLoadedInitialHistory] = useState(false);
-    const [hasNotifiedInitialHistoryLoaded, setHasNotifiedInitialHistoryLoaded] = useState(false);
-
-    const fetchConversations = useCallback(async () => {
-        try {
-            setIsLoadingConversations(true);
-            const response = await fetch('/api/conversations');
-            if (!response.ok) throw new Error(`Error HTTP ${response.status}`);
-            const data: Conversation[] = await response.json();
-            const forThisCharacter = data.filter(
-                (c) => c.character?.id === character.id
-            );
-            setConversations(forThisCharacter);
-            setHasLoadedInitialHistory(true);
-        } catch (err) {
-            console.error('Error al cargar conversaciones:', err);
-        } finally {
-            setIsLoadingConversations(false);
-        }
-    }, [character.id]);
-
-    useEffect(() => {
-        setHasLoadedInitialHistory(false);
-        setHasNotifiedInitialHistoryLoaded(false);
-    }, [character.id]);
-
-    useEffect(() => {
-        if (!hasLoadedInitialHistory || hasNotifiedInitialHistoryLoaded) {
-            return;
-        }
-
-        onInitialHistoryLoaded?.();
-        setHasNotifiedInitialHistoryLoaded(true);
-    }, [hasLoadedInitialHistory, hasNotifiedInitialHistoryLoaded, onInitialHistoryLoaded]);
-
-    useEffect(() => {
-        fetchConversations();
-    }, [fetchConversations]);
-
-    useEffect(() => {
-        const onConversationCreated = () => {
-            fetchConversations();
-        };
-
-        window.addEventListener('conversation:created', onConversationCreated);
-        return () => {
-            window.removeEventListener('conversation:created', onConversationCreated);
-        };
-    }, [fetchConversations]);
 
     useEffect(() => {
         setAvatarImageError(false);
@@ -183,66 +126,6 @@ export function CharacterContextPanel({
                         <p className="text-sm text-muted-foreground italic">
                             Las sugerencias de temas estarán disponibles próximamente.
                         </p>
-                    )}
-                </section>
-
-                {/* Session History — conversaciones reales */}
-                <section>
-                    <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-primary" />
-                        Historial de conversaciones
-                    </h3>
-
-                    {isLoadingConversations ? (
-                        <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Cargando conversaciones...
-                        </div>
-                    ) : conversations.length === 0 ? (
-                        <p className="text-sm text-muted-foreground italic">
-                            Aún no tienes conversaciones con este personaje.
-                        </p>
-                    ) : (
-                        <div className="space-y-2">
-                            {conversations.map((conv) => (
-                                <button
-                                    key={conv.id}
-                                    onClick={() => onSelectConversation?.({ id: conv.id, mode: conv.mode })}
-                                    className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors cursor-pointer ${
-                                        selectedConversationId === conv.id
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'bg-muted text-foreground hover:bg-muted/80'
-                                    }`}
-                                >
-                                    <MessageSquare className="h-4 w-4 shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate flex items-center gap-2">
-                                            Conversación
-                                            {conv.mode === 'debate' && (
-                                                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                                                    selectedConversationId === conv.id
-                                                        ? 'bg-primary-foreground/20 text-primary-foreground'
-                                                        : 'bg-amber-100 text-amber-700'
-                                                }`}>
-                                                    Debate
-                                                </span>
-                                            )}
-                                        </p>
-                                        <p className={`text-xs ${
-                                            selectedConversationId === conv.id
-                                                ? 'text-primary-foreground/70'
-                                                : 'text-muted-foreground'
-                                        }`}>
-                                            {new Date(conv.createdAt).toLocaleDateString('es-ES', {
-                                                day: 'numeric',
-                                                month: 'short',
-                                                year: 'numeric',
-                                            })}
-                                        </p>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
                     )}
                 </section>
             </div>

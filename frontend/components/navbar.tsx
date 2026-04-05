@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { Menu, X, BookOpen, User } from 'lucide-react'
+import { Menu, X, BookOpen, User, Moon, Sun } from 'lucide-react'
+import { useTheme } from '@/app/providers'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -15,6 +16,7 @@ export function Navbar({ transparent = false }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const pathname = usePathname()
   const { user, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
 
   if (pathname.startsWith('/login') || pathname.startsWith('/auth')) {
     return null
@@ -58,6 +60,15 @@ export function Navbar({ transparent = false }: NavbarProps) {
             </div>
 
             <div className="hidden md:flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                aria-label={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+                title={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+              >
+                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
               <p className="text-sm text-foreground/80">
                 Hola, <span className="font-semibold">{userDisplayName}</span>
               </p>
@@ -92,6 +103,16 @@ export function Navbar({ transparent = false }: NavbarProps) {
           {mobileMenuOpen && (
             <div className="md:hidden py-4 border-t border-border">
               <div className="flex flex-col gap-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start gap-2"
+                  onClick={toggleTheme}
+                  aria-label={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+                >
+                  {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  {theme === 'dark' ? 'Tema claro' : 'Tema oscuro'}
+                </Button>
                 <p className="text-sm text-foreground/80">
                   Hola, <span className="font-semibold">{userDisplayName}</span>
                 </p>
