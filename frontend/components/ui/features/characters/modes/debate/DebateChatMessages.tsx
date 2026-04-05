@@ -1,12 +1,16 @@
 "use client"
 
 import type React from "react"
+import { useCallback } from "react"
 import type { Character, DebateMessageMetadata, DebateWarningPayload, Message } from "@/types/chat.types"
 import { AudioMessagePlayer } from "@/components/ui/features/characters/shared/AudioMessagePlayer"
 import { TypingIndicator } from "@/components/ui/features/characters/modes/chat/TypingIndicator"
+import { StreamingText } from "@/components/ui/features/characters/shared/StreamingText"
 import { colorFromName, lightColorFromName } from "@/utils/character.utils"
+import { useAnimatedEntryKeys } from "@/hooks/useAnimatedEntryKeys"
 
 interface DebateChatMessagesProps {
+  conversationId: string
   messages: Message[]
   characterA: Character
   characterB: Character
@@ -26,12 +30,25 @@ const makePassthroughResolver = (audioUrl: string | null | undefined) =>
   async () => ({ audioUrl: audioUrl ?? null, mediaType: "audio/mpeg" as string | null })
 
 export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
+  conversationId,
   messages,
   characterA,
   characterB,
   typingCharacterId,
   messagesEndRef,
 }) => {
+  const getMessageAnimationKey = useCallback(
+    (message: Message) => `${String(message.id)}:${message.speakerId ?? "no-speaker"}`,
+    [],
+  )
+
+  const animatedMessageKeys = useAnimatedEntryKeys(
+    messages,
+    getMessageAnimationKey,
+    (message) => message.role === "assistant",
+    conversationId,
+  )
+
   const typingSpeaker =
     typingCharacterId === characterA.id
       ? characterA
@@ -87,7 +104,12 @@ export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
                 className={`rounded-2xl px-4 py-3 ${isCharA ? "rounded-bl-md" : "rounded-br-md"}`}
                 style={{ backgroundColor: themeColorLight }}
               >
-                <p className="text-sm leading-relaxed text-foreground">{message.content}</p>
+                <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
+                  <StreamingText
+                    text={message.content}
+                    animate={animatedMessageKeys.has(getMessageAnimationKey(message))}
+                  />
+                </p>
 
                 {message.audioUrl && (
                   <div className="mt-2">

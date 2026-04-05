@@ -1,11 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Mic, MicOff, Pause, Play, Phone, PhoneOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useCharacterById } from "@/hooks/useCharacterById"
 import { useBackendLive } from "@/hooks/useBackendLive"
+import { StreamingText } from "@/components/ui/features/characters/shared/StreamingText"
 import { ConnectionStatus } from "@/types/live.types"
+import { useAnimatedEntryKeys } from "@/hooks/useAnimatedEntryKeys"
 
 interface CallModePanelProps {
   characterId: string | null
@@ -78,10 +80,21 @@ export function CallModePanel({ characterId, onEndCall }: CallModePanelProps) {
     }
   }, [disconnect])
 
-  const transcriptLines = history.slice(-8).map((item) => {
-    const prefix = item.role === "user" ? "Tú" : (character?.name ?? "Personaje")
-    return `${prefix}: ${item.text}`
-  })
+  const getTranscriptAnimationKey = useCallback(
+    (item: (typeof history)[number]) => `${item.role}:${item.timestamp.toISOString()}:${item.text}`,
+    [],
+  )
+
+  const animatedTranscriptKeys = useAnimatedEntryKeys(
+    history,
+    getTranscriptAnimationKey,
+    () => true,
+  )
+
+  const transcriptLines = history.slice(-8).map((item) => ({
+    ...item,
+    prefix: item.role === "user" ? "Tú" : (character?.name ?? "Personaje"),
+  }))
 
   const handleTogglePause = () => {
     const nextPaused = !isPaused
@@ -201,9 +214,16 @@ export function CallModePanel({ characterId, onEndCall }: CallModePanelProps) {
           <p className="text-[11px] text-background/60 mb-2 uppercase tracking-wider">Transcripcion en tiempo real</p>
           <div className="space-y-2">
             {transcriptLines.length > 0 ? (
-              transcriptLines.map((line, idx) => (
-                <p key={`${line}-${idx}`} className="text-sm text-background/90 leading-relaxed">
-                  {line}
+              transcriptLines.map((item) => (
+                <p
+                  key={getTranscriptAnimationKey(item)}
+                  className="text-sm text-background/90 leading-relaxed whitespace-pre-wrap break-words"
+                >
+                  <span className="font-medium">{item.prefix}: </span>
+                  <StreamingText
+                    text={item.text}
+                    animate={animatedTranscriptKeys.has(getTranscriptAnimationKey(item))}
+                  />
                 </p>
               ))
             ) : (

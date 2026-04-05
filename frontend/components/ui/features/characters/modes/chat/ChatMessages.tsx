@@ -1,9 +1,12 @@
 import type React from "react"
+import { useCallback } from "react"
 import type { Message, CharacterReference } from "@/types/chat.types"
 import { AudioMessagePlayer } from "@/components/ui/features/characters/shared/AudioMessagePlayer"
 import { GenericRenderer } from "@/components/ui/features/characters/genui/GenericRenderer"
 import { ModeSwitchSeparator } from "@/components/ui/features/characters/modes/chat/ModeSwitchSeparator"
 import { TypingIndicator } from "@/components/ui/features/characters/modes/chat/TypingIndicator"
+import { StreamingText } from "@/components/ui/features/characters/shared/StreamingText"
+import { useAnimatedEntryKeys } from "@/hooks/useAnimatedEntryKeys"
 
 const MODE_SWITCH_MARKER_PREFIX = "__mode_switch:"
 
@@ -48,6 +51,18 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   const hasRenderableBlocks = (message: Message) => {
     return Array.isArray(message.blocks) && message.blocks.length > 0
   }
+
+  const getMessageAnimationKey = useCallback(
+    (message: Message) => `${conversationId ?? "no-conversation"}:${String(message.id)}`,
+    [conversationId],
+  )
+
+  const animatedMessageKeys = useAnimatedEntryKeys(
+    messages,
+    getMessageAnimationKey,
+    (message) => message.role === "assistant" && !hasRenderableBlocks(message),
+    conversationId,
+  )
 
   const getModeLabel = (mode: string): string => {
     if (mode === "interview") return "Entrevista"
@@ -128,7 +143,10 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
                   <GenericRenderer blocks={msg.blocks ?? []} />
                 ) : (
                   <p className={`text-sm leading-relaxed whitespace-pre-wrap break-words ${msg.role === "assistant" ? "font-serif" : ""}`}>
-                    {msg.content}
+                    <StreamingText
+                      text={msg.content}
+                      animate={animatedMessageKeys.has(getMessageAnimationKey(msg))}
+                    />
                   </p>
                 )}
                 {msg.role === "assistant" && (

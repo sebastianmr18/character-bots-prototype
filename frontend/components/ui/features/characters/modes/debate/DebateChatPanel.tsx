@@ -166,6 +166,7 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
           </p>
         )}
         <DebateChatMessages
+          conversationId={conversationId}
           messages={messages}
           characterA={characterA}
           characterB={characterB}
