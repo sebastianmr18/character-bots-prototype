@@ -1,14 +1,17 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Clock, Loader2, MessageSquare } from 'lucide-react'
 import type { Character, Conversation } from '@/types/chat.types'
+import { cn } from '@/lib/utils'
 
 interface CharacterConversationHistoryProps {
   character: Character
   onSelectConversation?: (conversation: { id: string; mode?: Conversation['mode'] }) => void
   selectedConversationId?: string
   onInitialHistoryLoaded?: () => void
+  className?: string
+  headerAction?: ReactNode
 }
 
 export function CharacterConversationHistory({
@@ -16,6 +19,8 @@ export function CharacterConversationHistory({
   onSelectConversation,
   selectedConversationId,
   onInitialHistoryLoaded,
+  className,
+  headerAction,
 }: CharacterConversationHistoryProps) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [isLoadingConversations, setIsLoadingConversations] = useState(true)
@@ -70,15 +75,20 @@ export function CharacterConversationHistory({
   }, [fetchConversations])
 
   return (
-    <aside className="h-full flex flex-col border-l border-border bg-muted/20">
+    <aside className={cn('flex h-full flex-col border-l border-border bg-muted/20', className)}>
       <div className="border-b border-border px-4 py-4">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          <Clock className="h-4 w-4 text-primary" />
-          Historial
-        </h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Conversaciones previas con {character.name}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Clock className="h-4 w-4 text-primary" />
+              Historial
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Conversaciones previas con {character.name}
+            </p>
+          </div>
+          {headerAction}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3">

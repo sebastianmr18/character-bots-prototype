@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { MessageSquare } from 'lucide-react';
 import type { Character } from '@/types/chat.types';
-import { colorFromName, lightColorFromName } from '@/utils/character.utils';
+import { EinsteinContextPanel } from '@/components/ui/features/characters/context-prototypes/einstein/EinsteinContextPanel';
+import { colorFromName, lightColorFromName, toSlug } from '@/utils/character.utils';
 
 interface CharacterContextPanelProps {
     character: Character;
@@ -17,10 +18,24 @@ export function CharacterContextPanel({
     const characterImageUrl = character.imageUrl ?? (character as Character & { image_url?: string | null }).image_url ?? null;
     const backgroundImageUrl = character.backgroundImageUrl ?? null;
     const [avatarImageError, setAvatarImageError] = useState(false);
+    const isEinsteinPrototype = toSlug(character.name) === 'albert-einstein'
 
     useEffect(() => {
         setAvatarImageError(false);
     }, [characterImageUrl]);
+
+    if (isEinsteinPrototype) {
+        return (
+            <EinsteinContextPanel
+                character={character}
+                themeColor={themeColor}
+                themeColorLight={themeColorLight}
+                characterImageUrl={characterImageUrl}
+                avatarImageError={avatarImageError}
+                onAvatarImageError={() => setAvatarImageError(true)}
+            />
+        )
+    }
 
     return (
         <div className="h-full flex flex-col">
