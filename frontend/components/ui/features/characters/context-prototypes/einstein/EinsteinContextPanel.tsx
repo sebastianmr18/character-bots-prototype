@@ -1,43 +1,354 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, Atom, Brain, Clock3, Lightbulb, MapPin, MessageSquare, Quote, Sparkles, Users } from 'lucide-react'
-import type { Character } from '@/types/chat.types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
-import { einsteinPrototypeContent } from '@/components/ui/features/characters/context-prototypes/einstein/einstein-context.mock'
-
-const TIMELINE_PHASE_LABELS = ['Descubrimientos', 'Nueva gravedad', 'Reconocimiento', 'Exilio', 'Responsabilidad']
-const TIMELINE_RELATIONSHIP_MAP = [[0], [0], [0, 1], [1, 2], [2]]
+import { useCharacterEditorialSection } from '@/hooks/useCharacterEditorialSection'
+import type { CharacterEditorial, EditorialCharacter, EditorialUiCopy } from '@/types/editorial.types'
+import { createEmptyEditorial, mergeEditorialContent } from '@/utils/editorial.utils'
 
 interface EinsteinContextPanelProps {
-  character: Character
+  character: EditorialCharacter
+  heroEditorial: CharacterEditorial
   themeColor: string
   themeColorLight: string
   characterImageUrl: string | null
   avatarImageError: boolean
+  isHeroLoading: boolean
   onAvatarImageError: () => void
+}
+
+function HeroPageSkeleton() {
+  return (
+    <div className="space-y-4 pb-1">
+      <div className="overflow-hidden rounded-[28px] border border-border bg-background">
+        <div className="space-y-4 px-4 pb-5 pt-4 sm:px-5">
+          <div className="flex items-start justify-between gap-4">
+            <Skeleton className="h-7 w-28 rounded-full" />
+            <Skeleton className="h-7 w-40 rounded-full" />
+          </div>
+
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <Skeleton className="mx-auto h-28 w-28 rounded-full sm:mx-0 sm:h-32 sm:w-32" />
+            <div className="min-w-0 flex-1 rounded-[24px] border border-border/70 bg-card/85 p-4">
+              <div className="space-y-3">
+                <Skeleton className="h-5 w-36" />
+                <Skeleton className="h-8 w-56" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-11/12" />
+              </div>
+            </div>
+          </div>
+
+          <section className="grid gap-3 sm:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Card key={index} className="gap-3 rounded-[24px] border-border/70 bg-card/85 py-3 shadow-xl backdrop-blur-md">
+                <CardContent className="px-4">
+                  <div className="flex items-start gap-3">
+                    <Skeleton className="mt-1 h-8 w-8 rounded-full" />
+                    <div className="w-full space-y-2">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-10/12" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </section>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OverviewPageSkeleton() {
+  return (
+    <div className="space-y-4 pb-1">
+      <Card className="gap-4 rounded-[24px] border-border/70 bg-card py-4">
+        <CardContent className="space-y-3 px-4">
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-10/12" />
+          <div className="grid gap-3 sm:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="rounded-2xl border border-border/70 bg-muted/40 p-3.5">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="mt-2 h-4 w-full" />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <section className="grid gap-4">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <Card key={index} className="gap-0 rounded-[24px] border-border/70 bg-card py-0 shadow-sm">
+            <CardContent className="px-4 py-4">
+              <div className="flex items-start gap-3.5">
+                <Skeleton className="h-10 w-10 rounded-2xl" />
+                <div className="w-full space-y-2">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-5 w-48" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-11/12" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+    </div>
+  )
+}
+
+function TimelinePageSkeleton() {
+  return (
+    <div className="space-y-4 pb-1">
+      <section className="space-y-3">
+        <Skeleton className="h-5 w-44" />
+        <div className="space-y-4">
+          <div className="rounded-[22px] border border-border/70 bg-card/70 px-3 py-4">
+            <div className="flex gap-2 overflow-hidden">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="flex min-w-[104px] shrink-0 flex-col items-center gap-2 rounded-2xl px-2 py-2">
+                  <Skeleton className="h-8 w-8 rounded-full" />
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Card className="gap-4 rounded-[24px] border-border/70 bg-card py-4 shadow-sm">
+            <CardContent className="space-y-4 px-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="w-full space-y-2">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-6 w-56" />
+                </div>
+                <Skeleton className="h-7 w-16 rounded-full" />
+              </div>
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-11/12" />
+              <div className="rounded-[20px] border border-border/70 bg-background/70 p-4">
+                <Skeleton className="h-3 w-28" />
+                <Skeleton className="mt-3 h-4 w-full" />
+                <Skeleton className="mt-2 h-4 w-10/12" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function ConversationPageSkeleton() {
+  return (
+    <div className="space-y-4 pb-1">
+      <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+        <Card className="gap-0 rounded-[24px] border-border/70 bg-card py-0 shadow-sm">
+          <CardContent className="px-4 py-4">
+            <div className="flex items-start gap-3.5">
+              <Skeleton className="h-10 w-10 rounded-2xl" />
+              <div className="w-full space-y-2">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-11/12" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="gap-4 rounded-[24px] border-border/70 bg-card py-4">
+          <CardContent className="space-y-3 px-4">
+            <Skeleton className="h-5 w-32" />
+            <div className="flex flex-wrap gap-2">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <Skeleton key={index} className="h-7 w-20 rounded-full" />
+              ))}
+            </div>
+            <Skeleton className="h-20 w-full rounded-2xl" />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="space-y-3">
+        <Skeleton className="h-5 w-56" />
+        <div className="grid gap-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Card key={index} className="gap-0 rounded-[22px] border-border/70 bg-card py-0">
+              <CardContent className="px-4 py-3.5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="w-full space-y-2">
+                    <Skeleton className="h-3 w-20" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-10/12" />
+                  </div>
+                  <Skeleton className="h-6 w-14 rounded-full" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function GalleryPageSkeleton() {
+  return (
+    <div className="space-y-4 pb-1">
+      <Card className="gap-4 rounded-[24px] border-border/70 bg-card py-4">
+        <CardContent className="space-y-4 px-4">
+          <div className="overflow-hidden rounded-[20px] border border-border bg-background">
+            <Skeleton className="aspect-[4/3] w-full rounded-none" />
+            <div className="space-y-3 border-t border-border px-4 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <Skeleton className="h-4 w-40" />
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-9 w-9 rounded-full" />
+                  <Skeleton className="h-9 w-9 rounded-full" />
+                </div>
+              </div>
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          </div>
+
+          <div className="rounded-[20px] border border-border/70 bg-muted/25 px-4 py-3">
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="mt-2 h-4 w-full" />
+            <Skeleton className="mt-2 h-10 w-40 rounded-full" />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
 
 export function EinsteinContextPanel({
   character,
+  heroEditorial,
   themeColor,
   themeColorLight,
   characterImageUrl,
   avatarImageError,
+  isHeroLoading,
   onAvatarImageError,
 }: EinsteinContextPanelProps) {
   const [currentPageIndex, setCurrentPageIndex] = useState(0)
   const [currentTimelineIndex, setCurrentTimelineIndex] = useState(0)
   const [currentGalleryIndex, setCurrentGalleryIndex] = useState(0)
 
-  const activeTimelineEntry = einsteinPrototypeContent.timeline[currentTimelineIndex]
+  const overviewSection = useCharacterEditorialSection(character.id, 'overview', true)
+  const timelineSection = useCharacterEditorialSection(character.id, 'timeline', true)
+  const relationsSection = useCharacterEditorialSection(character.id, 'relations', true)
+  const gallerySection = useCharacterEditorialSection(character.id, 'gallery', true)
+
+  const editorialSections = useMemo(
+    () => [
+      heroEditorial,
+      overviewSection.data?.editorial,
+      timelineSection.data?.editorial,
+      relationsSection.data?.editorial,
+      gallerySection.data?.editorial,
+    ].filter((section): section is CharacterEditorial => Boolean(section)),
+    [
+      gallerySection.data?.editorial,
+      heroEditorial,
+      overviewSection.data?.editorial,
+      relationsSection.data?.editorial,
+      timelineSection.data?.editorial,
+    ],
+  )
+
+  const editorial = useMemo(
+    () => editorialSections.reduce(
+      (accumulator, sectionEditorial) => mergeEditorialContent(accumulator, sectionEditorial),
+      createEmptyEditorial(),
+    ),
+    [editorialSections],
+  )
+
+  const copiesByKey = useMemo(
+    () => Object.fromEntries(editorial.uiCopies.map((copy: EditorialUiCopy) => [copy.copyKey, copy.text])),
+    [editorial.uiCopies],
+  )
+  const quickFacts = useMemo(
+    () => editorial.facts.filter((fact) => fact.sectionKey === 'quick_facts'),
+    [editorial.facts],
+  )
+  const overviewCards = useMemo(
+    () => editorial.contextCards.filter((card) => card.pageKey === 'overview'),
+    [editorial.contextCards],
+  )
+  const conversationCards = useMemo(
+    () => editorial.contextCards.filter((card) => card.pageKey === 'conversation'),
+    [editorial.contextCards],
+  )
+  const featuredQuotes = useMemo(() => {
+    if (editorial.quotes.length > 0) {
+      return editorial.quotes
+    }
+
+    return character.quote
+      ? [
+          {
+            id: 'legacy-quote',
+            text: character.quote,
+            attribution: character.name,
+            sortOrder: 0,
+            isFeatured: true,
+          },
+        ]
+      : []
+  }, [character.name, character.quote, editorial.quotes])
+  const timelineEntries = editorial.timelineEntries
+  const galleryImages = editorial.galleryImages
+  const overviewIntro = editorial.editorialBlocks.find((block) => block.blockKey === 'overview_intro')
+  const voiceDescription = editorial.editorialBlocks.find((block) => block.blockKey === 'voice_description')
+  const activeTimelineEntry = timelineEntries[currentTimelineIndex] ?? null
   const activeTimelineRelationships = useMemo(
-    () => (TIMELINE_RELATIONSHIP_MAP[currentTimelineIndex] ?? [])
-      .map((index: number) => einsteinPrototypeContent.relationships[index])
-      .filter(Boolean),
-    [currentTimelineIndex],
+    () => activeTimelineEntry?.relationships ?? [],
+    [activeTimelineEntry],
+  )
+  const hasOverviewResolved = Boolean(overviewSection.data) || Boolean(overviewSection.error)
+  const hasRelationsResolved = Boolean(relationsSection.data) || Boolean(relationsSection.error)
+  const isOverviewPageLoading = overviewSection.isLoading && !hasOverviewResolved
+  const isTimelinePageLoading = timelineSection.isLoading && timelineEntries.length === 0
+  const isConversationPageLoading = relationsSection.isLoading && !hasRelationsResolved
+  const isGalleryPageLoading = gallerySection.isLoading && galleryImages.length === 0
+
+  useEffect(() => {
+    setCurrentTimelineIndex((prev) => {
+      if (timelineEntries.length === 0) {
+        return 0
+      }
+
+      return Math.min(prev, timelineEntries.length - 1)
+    })
+  }, [timelineEntries.length])
+
+  useEffect(() => {
+    setCurrentGalleryIndex((prev) => {
+      if (galleryImages.length === 0) {
+        return 0
+      }
+
+      return Math.min(prev, galleryImages.length - 1)
+    })
+  }, [galleryImages.length])
+
+  const getCopy = useCallback(
+    (key: string, fallback: string) => copiesByKey[key] ?? fallback,
+    [copiesByKey],
   )
 
   const goToChat = () => {
@@ -50,8 +361,11 @@ export function EinsteinContextPanel({
       {
         id: 'hero',
         eyebrow: 'Etapa 1',
-        title: 'Albert Einstein',
-        description: 'Fisico nacido en 1879, figura central de la relatividad y una de las voces intelectuales más influyentes del siglo XX.',
+        title: getCopy('page_title', character.name),
+        description: getCopy(
+          'page_subtitle',
+          'Fisico nacido en 1879, figura central de la relatividad y una de las voces intelectuales más influyentes del siglo XX.',
+        ),
         content: (
           <div className="space-y-4 pb-1">
             <div className="relative overflow-hidden rounded-[28px] border border-border bg-background">
@@ -79,11 +393,11 @@ export function EinsteinContextPanel({
                 <div className="flex items-start justify-between gap-4">
                   <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-foreground/80 backdrop-blur-sm">
                     <Sparkles className="h-3.5 w-3.5" />
-                    {einsteinPrototypeContent.eyebrow}
+                    {character.role ?? character.category ?? 'Perfil'}
                   </div>
                   <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/70 px-3 py-1 text-[11px] text-muted-foreground backdrop-blur-sm">
                     <MapPin className="h-3.5 w-3.5" />
-                    {einsteinPrototypeContent.ambientLabel}
+                    {character.ambientLabel ?? 'Sin contexto editorial'}
                   </div>
                 </div>
 
@@ -118,17 +432,16 @@ export function EinsteinContextPanel({
                         >
                           {character.category ?? 'Ciencia'}
                         </span>
-                        <span>{character.years ?? '1879 - 1955'}</span>
+                        <span>{character.years ?? '1879 - '}</span>
                       </div>
                       <h1 className="font-serif text-2xl font-semibold tracking-tight text-foreground sm:text-[28px]">{character.name}</h1>
-                      <p className="text-[13px] text-muted-foreground">{character.role}</p>
-                      <p className="max-w-xl text-[13px] leading-5 text-foreground/85">{einsteinPrototypeContent.summary}</p>
+                      <p className="max-w-xl text-[13px] leading-5 text-foreground/85">{character.description}</p>
                     </div>
                   </div>
                 </div>
 
                 <section className="grid gap-3 sm:grid-cols-2">
-                  {einsteinPrototypeContent.featuredQuotes.map((quoteItem, index) => (
+                  {featuredQuotes.map((quoteItem, index) => (
                     <Card key={`${quoteItem.text}-${index}`} className="gap-3 rounded-[24px] border-border/70 bg-card/85 py-3 shadow-xl backdrop-blur-md">
                       <CardContent className="px-4">
                         <div className="flex items-start gap-3">
@@ -151,11 +464,13 @@ export function EinsteinContextPanel({
             </div>
           </div>
         ),
+        skeleton: <HeroPageSkeleton />,
+        isLoading: isHeroLoading,
       },
       {
         id: 'overview',
         eyebrow: 'Etapa 2',
-        title: 'Contexto biografico e intelectual',
+        title: getCopy('overview_section_title', 'Contexto biografico e intelectual'),
         description: 'Una síntesis de los rasgos, obsesiones y preguntas que atravesaron su vida y su obra científica.',
         content: (
           <div className="space-y-4 pb-1">
@@ -165,9 +480,14 @@ export function EinsteinContextPanel({
                   <Brain className="h-4 w-4 text-primary" />
                   Antes de hablar con Einstein
                 </div>
-                <p className="text-[13px] leading-5 text-muted-foreground">{einsteinPrototypeContent.atmosphere}</p>
+                {overviewSection.isLoading && !overviewIntro && quickFacts.length === 0 ? (
+                  <p className="text-[13px] leading-5 text-muted-foreground">Cargando contexto editorial...</p>
+                ) : null}
+                {overviewIntro ? (
+                  <p className="text-[13px] leading-5 text-muted-foreground">{overviewIntro.body}</p>
+                ) : null}
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {einsteinPrototypeContent.quickFacts.map((fact) => (
+                  {quickFacts.map((fact) => (
                     <div key={fact.label} className="rounded-2xl border border-border/70 bg-muted/40 p-3.5">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{fact.label}</p>
                       <p className="mt-1.5 text-[13px] font-medium leading-5 text-foreground">{fact.value}</p>
@@ -178,8 +498,15 @@ export function EinsteinContextPanel({
             </Card>
 
             <section className="grid gap-4">
-              {einsteinPrototypeContent.contextCards.slice(1).map((card, index) => {
-                const Icon = index === 0 ? Lightbulb : Sparkles
+              {hasOverviewResolved && !overviewSection.isLoading && overviewCards.length === 0 ? (
+                <Card className="gap-0 rounded-[24px] border-border/70 bg-card py-0 shadow-sm">
+                  <CardContent className="px-4 py-4 text-[13px] leading-5 text-muted-foreground">
+                    Esta sección todavía no tiene tarjetas editoriales cargadas.
+                  </CardContent>
+                </Card>
+              ) : null}
+              {overviewCards.map((card) => {
+                const Icon = card.iconKey === 'sparkles' ? Sparkles : Lightbulb
 
                 return (
                   <Card key={card.title} className="gap-0 rounded-[24px] border-border/70 bg-card py-0 shadow-sm">
@@ -218,11 +545,13 @@ export function EinsteinContextPanel({
             ) : null}
           </div>
         ),
+        skeleton: <OverviewPageSkeleton />,
+        isLoading: isOverviewPageLoading,
       },
       {
         id: 'timeline',
         eyebrow: 'Etapa 3',
-        title: 'Hitos e ideas fundamentales',
+        title: getCopy('timeline_section_title', 'Hitos e ideas fundamentales'),
         description: 'Del annus mirabilis a Princeton: momentos decisivos para entender cómo cambió la física moderna.',
         content: (
           <div className="space-y-4 pb-1">
@@ -232,15 +561,20 @@ export function EinsteinContextPanel({
                 Timeline conversacional
               </div>
               <div className="space-y-4">
+                {timelineSection.isLoading && timelineEntries.length === 0 ? (
+                  <div className="rounded-[20px] border border-dashed border-border bg-background/70 p-4 text-[13px] leading-5 text-muted-foreground">
+                    Cargando timeline editorial...
+                  </div>
+                ) : null}
                 <div className="relative overflow-hidden rounded-[22px] border border-border/70 bg-card/70 px-3 py-4">
                   <div className="absolute left-6 right-6 top-[34px] h-px bg-border" />
                   <div className="relative flex gap-2 overflow-x-auto pb-1">
-                    {einsteinPrototypeContent.timeline.map((entry, index) => {
+                    {timelineEntries.map((entry, index) => {
                       const isActive = index === currentTimelineIndex
 
                       return (
                         <button
-                          key={`${entry.year}-${entry.title}`}
+                          key={`${entry.yearLabel}-${entry.title}`}
                           type="button"
                           onClick={() => setCurrentTimelineIndex(index)}
                           onMouseEnter={() => setCurrentTimelineIndex(index)}
@@ -257,11 +591,11 @@ export function EinsteinContextPanel({
                             )}
                             style={isActive ? { backgroundColor: themeColor } : undefined}
                           >
-                            {entry.year}
+                            {entry.yearLabel}
                           </div>
                           <div className="min-w-0">
                             <p className={cn('text-[11px] font-semibold', isActive ? 'text-foreground' : 'text-muted-foreground')}>
-                              {TIMELINE_PHASE_LABELS[index] ?? 'Hito'}
+                              {entry.phaseLabel ?? 'Hito'}
                             </p>
                             <p className={cn('line-clamp-2 text-[10px]', isActive ? 'text-foreground/80' : 'text-muted-foreground')}>
                               {entry.title}
@@ -275,91 +609,115 @@ export function EinsteinContextPanel({
 
                 <Card className="gap-4 rounded-[24px] border-border/70 bg-card py-4 shadow-sm">
                   <CardContent className="space-y-4 px-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                          {TIMELINE_PHASE_LABELS[currentTimelineIndex] ?? 'Hito histórico'}
-                        </p>
-                        <h3 className="mt-1 text-[16px] font-semibold text-foreground">{activeTimelineEntry.title}</h3>
-                      </div>
-                      <div
-                        className="rounded-full px-3 py-1 text-[11px] font-semibold text-white"
-                        style={{ backgroundColor: themeColor }}
-                      >
-                        {activeTimelineEntry.year}
-                      </div>
-                    </div>
-
-                    <p className="text-[13px] leading-5 text-muted-foreground">
-                      {activeTimelineEntry.description}
-                    </p>
-
-                    <div className="rounded-[20px] border border-border/70 bg-background/70 p-4">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        Lectura del momento
-                      </p>
-                      <p className="mt-2 text-[13px] leading-5 text-foreground/85">
-                        {currentTimelineIndex === 0 && 'En 1905, Einstein todavía trabajaba en la oficina de patentes de Berna. Desde fuera no parecía una figura central de la ciencia, pero ese año publicó artículos que cambiaron la manera de pensar la luz, el movimiento y el tiempo.'}
-                        {currentTimelineIndex === 1 && 'La relatividad general cambió la imagen clásica del universo: la gravedad dejó de ser una fuerza entre masas para convertirse en geometría del espacio-tiempo. Fue una de las formulaciones más audaces de la física moderna.'}
-                        {currentTimelineIndex === 2 && 'El Nobel y la fama internacional convirtieron a Einstein en algo más que un científico. Su imagen empezó a circular como símbolo del genio moderno y lo llevó a ocupar un lugar central en la cultura pública del siglo XX.'}
-                        {currentTimelineIndex === 3 && 'El exilio transformó su vida intelectual y personal. La salida de Alemania no fue solo un desplazamiento geográfico: marcó una ruptura con Europa y una conciencia cada vez más intensa del vínculo entre ciencia e historia.'}
-                        {currentTimelineIndex === 4 && 'Después de la Segunda Guerra Mundial, Einstein habló cada vez más sobre desarme, paz y responsabilidad. Su legado ya no se limitaba a las ecuaciones: también incluía una reflexión pública sobre el destino moral de la técnica.'}
-                      </p>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
-                        <Users className="h-4 w-4 text-primary" />
-                        Ecosistema humano del hito
-                      </div>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {activeTimelineRelationships.map((relationship: (typeof einsteinPrototypeContent.relationships)[number]) => (
-                          <div key={relationship.name} className="rounded-2xl border border-border/70 bg-muted/35 p-3.5">
-                            <p className="text-[13px] font-semibold text-foreground">{relationship.name}</p>
-                            <p className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{relationship.role}</p>
-                            <p className="mt-1.5 text-[13px] leading-5 text-muted-foreground">{relationship.dynamic}</p>
+                    {activeTimelineEntry ? (
+                      <>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                              {activeTimelineEntry.phaseLabel ?? 'Hito histórico'}
+                            </p>
+                            <h3 className="mt-1 text-[16px] font-semibold text-foreground">{activeTimelineEntry.title}</h3>
                           </div>
-                        ))}
+                          <div
+                            className="rounded-full px-3 py-1 text-[11px] font-semibold text-white"
+                            style={{ backgroundColor: themeColor }}
+                          >
+                            {activeTimelineEntry.yearLabel}
+                          </div>
+                        </div>
+
+                        <p className="text-[13px] leading-5 text-muted-foreground">
+                          {activeTimelineEntry.description}
+                        </p>
+
+                        {activeTimelineEntry.narrativeText ? (
+                          <div className="rounded-[20px] border border-border/70 bg-background/70 p-4">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                              Lectura del momento
+                            </p>
+                            <p className="mt-2 text-[13px] leading-5 text-foreground/85">
+                              {activeTimelineEntry.narrativeText}
+                            </p>
+                          </div>
+                        ) : null}
+
+                        {activeTimelineRelationships.length > 0 ? (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+                              <Users className="h-4 w-4 text-primary" />
+                              Ecosistema humano del hito
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              {activeTimelineRelationships.map((relationship) => (
+                                <div key={relationship.id} className="rounded-2xl border border-border/70 bg-muted/35 p-3.5">
+                                  <p className="text-[13px] font-semibold text-foreground">{relationship.name}</p>
+                                  {relationship.role ? (
+                                    <p className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{relationship.role}</p>
+                                  ) : null}
+                                  {relationship.dynamic ? (
+                                    <p className="mt-1.5 text-[13px] leading-5 text-muted-foreground">{relationship.dynamic}</p>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <div className="rounded-[20px] border border-dashed border-border bg-background/70 p-4 text-[13px] leading-5 text-muted-foreground">
+                        Este personaje todavía no tiene hitos editoriales cargados.
                       </div>
-                    </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
             </section>
           </div>
         ),
+        skeleton: <TimelinePageSkeleton />,
+        isLoading: isTimelinePageLoading,
       },
       {
         id: 'conversation',
         eyebrow: 'Etapa 4',
-        title: 'Relaciones, controversias y preguntas',
+        title: getCopy('relations_section_title', 'Relaciones, controversias y preguntas'),
         description: 'Personas, tensiones intelectuales y preguntas iniciales que revelan distintas facetas de Einstein.',
         content: (
           <div className="space-y-4 pb-1">
             <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-              <Card className="gap-0 rounded-[24px] border-border/70 bg-card py-0 shadow-sm">
-                <CardContent className="px-4 py-4">
-                  <div className="flex items-start gap-3.5">
-                    <div
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white"
-                      style={{ backgroundColor: themeColor }}
-                    >
-                      <Atom className="h-5 w-5" />
+              {conversationCards[0] ? (
+                <Card className="gap-0 rounded-[24px] border-border/70 bg-card py-0 shadow-sm">
+                  <CardContent className="px-4 py-4">
+                    <div className="flex items-start gap-3.5">
+                      <div
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white"
+                        style={{ backgroundColor: themeColor }}
+                      >
+                        <Atom className="h-5 w-5" />
+                      </div>
+                      <div>
+                        {conversationCards[0].eyebrow ? (
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            {conversationCards[0].eyebrow}
+                          </p>
+                        ) : null}
+                        <h3 className="mt-1 text-[15px] font-semibold text-foreground">
+                          {conversationCards[0].title}
+                        </h3>
+                        <p className="mt-1.5 text-[13px] leading-5 text-muted-foreground">
+                          {conversationCards[0].body}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        {einsteinPrototypeContent.contextCards[0]?.eyebrow}
-                      </p>
-                      <h3 className="mt-1 text-[15px] font-semibold text-foreground">
-                        {einsteinPrototypeContent.contextCards[0]?.title}
-                      </h3>
-                      <p className="mt-1.5 text-[13px] leading-5 text-muted-foreground">
-                        {einsteinPrototypeContent.contextCards[0]?.body}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="gap-0 rounded-[24px] border-border/70 bg-card py-0 shadow-sm">
+                  <CardContent className="px-4 py-4 text-[13px] leading-5 text-muted-foreground">
+                    No hay tarjetas editoriales cargadas para esta sección.
+                  </CardContent>
+                </Card>
+              )}
 
               <Card className="gap-4 rounded-[24px] border-border/70 bg-card py-4">
                 <CardContent className="space-y-3 px-4">
@@ -368,7 +726,7 @@ export function EinsteinContextPanel({
                     Su voz intelectual
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {einsteinPrototypeContent.tonePills.map((pill) => (
+                    {(character.keyTraits ?? []).map((pill) => (
                       <span
                         key={pill}
                         className="rounded-full border border-border bg-background px-3 py-1 text-[11px] font-medium text-foreground/75"
@@ -378,7 +736,7 @@ export function EinsteinContextPanel({
                     ))}
                   </div>
                   <div className="rounded-2xl border border-dashed border-border bg-muted/25 p-3.5 text-[13px] leading-5 text-muted-foreground">
-                    Cuando explica una idea, Einstein suele partir de una imagen concreta antes de llegar a la abstracción: un tren en movimiento, una luz que viaja, un observador que cae. Su tono combina paciencia didáctica, precisión conceptual y una ironía suave cuando discute límites o paradojas.
+                    {voiceDescription?.body ?? 'Este personaje todavía no tiene una descripción editorial de voz cargada.'}
                   </div>
                 </CardContent>
               </Card>
@@ -389,21 +747,28 @@ export function EinsteinContextPanel({
                 <Sparkles className="h-4 w-4 text-primary" />
                 Preguntas para iniciar la conversación
               </div>
+              {relationsSection.isLoading && editorial.prompts.length === 0 ? (
+                <div className="rounded-[20px] border border-dashed border-border bg-background/70 p-4 text-[13px] leading-5 text-muted-foreground">
+                  Cargando recursos conversacionales...
+                </div>
+              ) : null}
               <div className="grid gap-3">
-                {einsteinPrototypeContent.promptCards.map((promptCard) => (
+                {editorial.prompts.map((promptCard) => (
                   <Card key={promptCard.prompt} className="gap-0 rounded-[22px] border-border/70 bg-card py-0 transition-colors hover:bg-muted/20">
                     <CardContent className="px-4 py-3.5">
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{promptCard.label}</p>
+                          {promptCard.label ? (
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{promptCard.label}</p>
+                          ) : null}
                           <p className="mt-1.5 text-[13px] font-medium leading-5 text-foreground">{promptCard.prompt}</p>
-                          <p className="mt-1 text-[13px] text-muted-foreground">{promptCard.note}</p>
+                          {promptCard.note ? <p className="mt-1 text-[13px] text-muted-foreground">{promptCard.note}</p> : null}
                         </div>
                         <div
                           className="rounded-full px-2.5 py-1 text-[10px] font-semibold text-white"
                           style={{ backgroundColor: themeColor }}
                         >
-                          Inicio
+                          {promptCard.ctaLabel ?? 'Inicio'}
                         </div>
                       </div>
                     </CardContent>
@@ -411,40 +776,60 @@ export function EinsteinContextPanel({
                 ))}
               </div>
             </section>
+
+            {hasRelationsResolved && !relationsSection.isLoading && editorial.prompts.length === 0 ? (
+              <div className="rounded-[20px] border border-dashed border-border bg-background/70 p-4 text-[13px] leading-5 text-muted-foreground">
+                Esta sección todavía no tiene preguntas iniciales cargadas.
+              </div>
+            ) : null}
           </div>
         ),
+        skeleton: <ConversationPageSkeleton />,
+        isLoading: isConversationPageLoading,
       },
       {
         id: 'gallery',
         eyebrow: 'Etapa 5',
-        title: 'Galeria visual',
+        title: getCopy('gallery_section_title', 'Galeria visual'),
         description: 'Un recorrido por retratos e imágenes de archivo que sitúan a Einstein en distintos momentos de su vida pública.',
         content: (
           <div className="space-y-4 pb-1">
+            {gallerySection.isLoading && galleryImages.length === 0 ? (
+              <div className="rounded-[20px] border border-dashed border-border bg-background/70 p-4 text-[13px] leading-5 text-muted-foreground">
+                Cargando galería editorial...
+              </div>
+            ) : null}
             <Card className="gap-4 rounded-[24px] border-border/70 bg-card py-4">
               <CardContent className="space-y-4 px-4">
                 <div className="overflow-hidden rounded-[20px] border border-border bg-background">
                   <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
-                    <img
-                      src={einsteinPrototypeContent.galleryImages[currentGalleryIndex]?.src}
-                      alt={einsteinPrototypeContent.galleryImages[currentGalleryIndex]?.alt}
-                      className="h-full w-full object-cover"
-                    />
+                    {galleryImages[currentGalleryIndex] ? (
+                      <img
+                        src={galleryImages[currentGalleryIndex].imageUrl}
+                        alt={galleryImages[currentGalleryIndex].alt ?? character.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center px-6 text-center text-[13px] text-muted-foreground">
+                        No hay imágenes editoriales cargadas para este personaje.
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-3 border-t border-border px-4 py-4">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-[13px] font-semibold text-foreground">
-                        Imagen {currentGalleryIndex + 1} de {einsteinPrototypeContent.galleryImages.length}
+                        Imagen {Math.min(currentGalleryIndex + 1, Math.max(galleryImages.length, 1))} de {Math.max(galleryImages.length, 1)}
                       </p>
                       <div className="flex items-center gap-2">
                         <Button
                           type="button"
                           variant="outline"
                           size="icon-sm"
-                          onClick={() => setCurrentGalleryIndex((prev) => (prev === 0 ? einsteinPrototypeContent.galleryImages.length - 1 : prev - 1))}
+                          onClick={() => setCurrentGalleryIndex((prev) => (galleryImages.length === 0 ? 0 : prev === 0 ? galleryImages.length - 1 : prev - 1))}
                           aria-label="Imagen anterior"
                           className="rounded-full"
+                          disabled={galleryImages.length === 0}
                         >
                           <ArrowLeft className="h-4 w-4" />
                         </Button>
@@ -452,21 +837,24 @@ export function EinsteinContextPanel({
                           type="button"
                           variant="outline"
                           size="icon-sm"
-                          onClick={() => setCurrentGalleryIndex((prev) => (prev + 1) % einsteinPrototypeContent.galleryImages.length)}
+                          onClick={() => setCurrentGalleryIndex((prev) => (galleryImages.length === 0 ? 0 : (prev + 1) % galleryImages.length))}
                           aria-label="Imagen siguiente"
                           className="rounded-full"
+                          disabled={galleryImages.length === 0}
                         >
                           <ArrowRight className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
 
-                    <p className="text-[13px] leading-5 text-muted-foreground">
-                      {einsteinPrototypeContent.galleryImages[currentGalleryIndex]?.caption}
-                    </p>
-                    {einsteinPrototypeContent.galleryImages[currentGalleryIndex]?.credit ? (
+                    {galleryImages[currentGalleryIndex]?.caption ? (
+                      <p className="text-[13px] leading-5 text-muted-foreground">
+                        {galleryImages[currentGalleryIndex].caption}
+                      </p>
+                    ) : null}
+                    {galleryImages[currentGalleryIndex]?.credit ? (
                       <footer className="text-[11px] leading-4 text-muted-foreground">
-                        {einsteinPrototypeContent.galleryImages[currentGalleryIndex]?.credit}
+                        {galleryImages[currentGalleryIndex].credit}
                       </footer>
                     ) : null}
                   </div>
@@ -474,36 +862,62 @@ export function EinsteinContextPanel({
 
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-border/70 bg-muted/25 px-4 py-3">
                   <div>
-                    <p className="text-[13px] font-semibold text-foreground">Conversa a partir de una imagen</p>
+                    <p className="text-[13px] font-semibold text-foreground">{getCopy('image_prompt_title', 'Conversa a partir de una imagen')}</p>
                     <p className="mt-1 text-[13px] leading-5 text-muted-foreground">
-                      Usa el retrato o el contexto histórico de esta foto para abrir una conversación más situada y concreta.
+                      {getCopy('image_prompt_body', 'Usa el retrato o el contexto histórico de esta foto para abrir una conversación más situada y concreta.')}
                     </p>
                   </div>
                   <Button type="button" onClick={goToChat} className="rounded-full">
-                    Iniciar conversación
+                    {getCopy('start_conversation_label', 'Iniciar conversación')}
                   </Button>
                 </div>
               </CardContent>
             </Card>
           </div>
         ),
+        skeleton: <GalleryPageSkeleton />,
+        isLoading: isGalleryPageLoading,
       },
     ],
     [
       avatarImageError,
       character.biography,
       character.category,
+      character.description,
       character.name,
-      character.role,
       character.years,
+      character.role,
+      character.ambientLabel,
+      character.keyTraits,
       characterImageUrl,
-      currentTimelineIndex,
+      editorial.prompts,
+      gallerySection.isLoading,
+      hasOverviewResolved,
+      hasRelationsResolved,
+      isConversationPageLoading,
+      isGalleryPageLoading,
+      isHeroLoading,
+      isOverviewPageLoading,
+      isTimelinePageLoading,
       onAvatarImageError,
+      overviewSection.isLoading,
+      relationsSection.isLoading,
       themeColor,
       themeColorLight,
+      timelineSection.isLoading,
       currentGalleryIndex,
+      currentTimelineIndex,
       activeTimelineEntry,
       activeTimelineRelationships,
+      conversationCards,
+      featuredQuotes,
+      galleryImages,
+      getCopy,
+      overviewCards,
+      overviewIntro,
+      quickFacts,
+      timelineEntries,
+      voiceDescription,
     ],
   )
 
@@ -533,7 +947,7 @@ export function EinsteinContextPanel({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-          {currentPage.content}
+          {currentPage.isLoading ? currentPage.skeleton : currentPage.content}
         </div>
 
         <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/80 pt-4">
