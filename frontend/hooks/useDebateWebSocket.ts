@@ -8,6 +8,7 @@ import type {
   DebateErrorPayload,
   DebateMessageMetadata,
   DebateRoundCompletePayload,
+  DebateTurnSkippedPayload,
   DebateStartedPayload,
   DebateTurnPayload,
   DebateTypingPayload,
@@ -98,7 +99,37 @@ const buildTurnMessage = (payload: DebateTurnPayload): Message => {
     payload.traceId,
     {
       turnOrder: payload.turn_order,
+      isForced: payload.is_forced ?? false,
       warning: payload.warning ?? null,
+    },
+  )
+}
+
+const buildSkippedTurnMessage = (payload: DebateTurnSkippedPayload): Message => {
+  const reasonDetail = payload.reason_detail?.trim()
+  const content = reasonDetail
+    ? `${payload.speaker_name} ha pasado su turno. (${reasonDetail})`
+    : `${payload.speaker_name} ha pasado su turno.`
+
+  return createTraceScopedMessage(
+    {
+      id: `skip_${payload.traceId}_${payload.speaker_id}_${payload.reason}`,
+      role: "assistant",
+      content,
+      speakerId: payload.speaker_id,
+      speakerName: payload.speaker_name,
+      audioUrl: null,
+      mediaType: null,
+    },
+    payload.traceId,
+    {
+      turnOrder: payload.turn_order,
+      isForced: payload.is_forced ?? false,
+      isSkipped: true,
+      skipReason: payload.reason,
+      skipReasonDetail: payload.reason_detail ?? null,
+      skipConfidence: payload.confidence ?? null,
+      warning: null,
     },
   )
 }
@@ -141,7 +172,7 @@ export const useDebateWebSocket = ({
   }, [])
 
   const emitDebateMessage = useCallback(
-    (text: string) => {
+    (text: string, forcedSpeakerId?: string | null) => {
       const trimmedText = text.trim()
       if (!trimmedText || !socketRef.current || !isConnected || !conversationId || isSending) {
         return false
@@ -154,10 +185,32 @@ export const useDebateWebSocket = ({
       setTypingCharacterId(null)
       setIsSending(true)
       onStatusChange("Esperando confirmación...")
-      socketRef.current.emit("send_debate_text", { conversationId, text: trimmedText })
+      socketRef.current.emit("send_debate_text", {
+        conversationId,
+        text: trimmedText,
+        forced_speaker_id: forcedSpeakerId ?? null,
+      })
       return true
     },
     [conversationId, isConnected, isSending, onStatusChange],
+  )
+
+  const emitSkipDebateTurn = useCallback(
+    (speakerId: string, reason?: string) => {
+      const trimmedSpeakerId = speakerId.trim()
+      if (!trimmedSpeakerId || !socketRef.current || !isConnected || !conversationId || isSending) {
+        return false
+      }
+
+      socketRef.current.emit("skip_debate_turn", {
+        conversationId,
+        speaker_id: trimmedSpeakerId,
+        reason,
+      })
+
+      return true
+    },
+    [conversationId, isConnected, isSending],
   )
 
   useEffect(() => {
@@ -266,7 +319,11 @@ export const useDebateWebSocket = ({
 
         activeRoundTraceIdRef.current = data.traceId
         setTypingCharacterId(data.speaker_id)
-        onStatusChange(`${data.speaker_name} está pensando...`)
+        onStatusChange(
+          data.is_forced
+            ? `${data.speaker_name} está pensando (turno forzado)...`
+            : `${data.speaker_name} está pensando...`,
+        )
       })
 
       socket.on("debate_turn", (data: DebateTurnPayload) => {
@@ -275,13 +332,16 @@ export const useDebateWebSocket = ({
         activeRoundTraceIdRef.current = data.traceId
         setTypingCharacterId(null)
         setMessages((prev) => upsertMessagesById(prev, [buildTurnMessage(data)]))
+        onStatusChange("Esperando siguiente respuesta...")
+      })
 
-        if (data.turn_order === "A") {
-          onStatusChange("Esperando siguiente respuesta...")
-          return
-        }
+      socket.on("debate_turn_skipped", (data: DebateTurnSkippedPayload) => {
+        if (data.conversationId !== conversationId) return
 
-        onStatusChange("Cerrando ronda...")
+        activeRoundTraceIdRef.current = data.traceId
+        setTypingCharacterId(null)
+        setMessages((prev) => upsertMessagesById(prev, [buildSkippedTurnMessage(data)]))
+        onStatusChange("Esperando siguiente respuesta...")
       })
 
       socket.on("debate_round_complete", (data: DebateRoundCompletePayload) => {
@@ -350,10 +410,17 @@ export const useDebateWebSocket = ({
   }, [clearRoundState, conversationId, onStatusChange, reconcileHistory])
 
   const sendDebateMessage = useCallback(
-    (text: string) => {
-      void emitDebateMessage(text)
+    (text: string, forcedSpeakerId?: string | null) => {
+      void emitDebateMessage(text, forcedSpeakerId)
     },
     [emitDebateMessage],
+  )
+
+  const skipDebateTurn = useCallback(
+    (speakerId: string, reason?: string) => {
+      return emitSkipDebateTurn(speakerId, reason)
+    },
+    [emitSkipDebateTurn],
   )
 
   const retryLastMessage = useCallback(() => {
@@ -366,6 +433,7 @@ export const useDebateWebSocket = ({
     messages,
     setMessages,
     sendDebateMessage,
+    skipDebateTurn,
     retryLastMessage,
     isConnected,
     isSending,

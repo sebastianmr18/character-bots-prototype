@@ -70,6 +70,9 @@ export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
           )
         }
 
+        const debateMetadata = message.metadata as DebateMessageMetadata | undefined
+        const isSkipped = debateMetadata?.isSkipped === true
+
         // Determine which character is speaking
         const isCharA = message.speakerId === characterA.id
         const speaker = isCharA ? characterA : characterB
@@ -77,7 +80,7 @@ export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
         const themeColor = getThemeColor(speaker)
         const themeColorLight = getThemeColorLight(speaker)
 
-        const warning = (message.metadata as DebateMessageMetadata | undefined)?.warning as
+        const warning = debateMetadata?.warning as
           | DebateWarningPayload
           | null
           | undefined
@@ -97,6 +100,11 @@ export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
                   {shortName[0]}
                 </div>
                 <span className="text-xs font-medium text-foreground/70">{shortName}</span>
+                {debateMetadata?.isForced && (
+                  <span className="rounded-full border border-foreground/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground/70">
+                    Forzado
+                  </span>
+                )}
               </div>
 
               {/* Bubble */}
@@ -104,14 +112,20 @@ export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
                 className={`rounded-2xl px-4 py-3 ${isCharA ? "rounded-bl-md" : "rounded-br-md"}`}
                 style={{ backgroundColor: themeColorLight }}
               >
-                <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
-                  <StreamingText
-                    text={message.content}
-                    animate={animatedMessageKeys.has(getMessageAnimationKey(message))}
-                  />
-                </p>
+                {isSkipped ? (
+                  <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap break-words italic">
+                    {message.content}
+                  </p>
+                ) : (
+                  <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
+                    <StreamingText
+                      text={message.content}
+                      animate={animatedMessageKeys.has(getMessageAnimationKey(message))}
+                    />
+                  </p>
+                )}
 
-                {message.audioUrl && (
+                {message.audioUrl && !isSkipped && (
                   <div className="mt-2">
                     <AudioMessagePlayer
                       messageId={message.id}

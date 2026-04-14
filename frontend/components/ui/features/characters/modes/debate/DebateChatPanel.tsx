@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
-import { ArrowLeft, Send, Swords } from "lucide-react"
+import { ArrowLeft, MicOff, Send, Swords } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StatusIndicator } from "@/components/ui/features/characters/shared/StatusIndicator"
@@ -33,6 +33,7 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
 }) => {
   const [status, setStatus] = useState("Conectando...")
   const [inputValue, setInputValue] = useState("")
+  const [forcedSpeakerId, setForcedSpeakerId] = useState<string | null>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -52,6 +53,7 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
     messages,
     setMessages,
     sendDebateMessage,
+    skipDebateTurn,
     retryLastMessage,
     isConnected,
     isSending,
@@ -83,6 +85,10 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
     }
   }, [conversationId, loadHistory, setMessages])
 
+  useEffect(() => {
+    setForcedSpeakerId(null)
+  }, [conversationId])
+
   // Auto-scroll on new messages
   const scrollToBottom = useCallback(() => {
     const container = messagesContainerRef.current
@@ -96,13 +102,20 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
 
   const handleSend = () => {
     if (!inputValue.trim() || !isConnected || isSending) return
-    sendDebateMessage(inputValue.trim())
+    sendDebateMessage(inputValue.trim(), forcedSpeakerId)
     setInputValue("")
+    setForcedSpeakerId(null)
   }
 
   const handleRetry = () => {
     void retryLastMessage()
   }
+
+  const handleSkip = (speakerId: string) => {
+    skipDebateTurn(speakerId, "manual_user")
+  }
+
+  const controlsDisabled = !isConnected || isSending
 
   const colorA = getThemeColor(characterA)
   const colorB = getThemeColor(characterB)
@@ -203,6 +216,84 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
 
       {/* Input */}
       <div className="border-t border-border p-4 shrink-0">
+        <div className="mb-3 rounded-xl border border-border/70 bg-muted/30 p-3 space-y-3">
+          <p className="text-xs font-medium text-foreground/80">Control de turnos (próxima ronda)</p>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <Button
+              type="button"
+              variant={forcedSpeakerId === null ? "default" : "outline"}
+              size="sm"
+              disabled={controlsDisabled}
+              onClick={() => setForcedSpeakerId(null)}
+            >
+              Alternar automático
+            </Button>
+            <Button
+              type="button"
+              variant={forcedSpeakerId === characterA.id ? "default" : "outline"}
+              size="sm"
+              disabled={controlsDisabled}
+              onClick={() => setForcedSpeakerId(characterA.id)}
+            >
+              {getShortName(characterA)} luego {getShortName(characterB)}
+            </Button>
+            <Button
+              type="button"
+              variant={forcedSpeakerId === characterB.id ? "default" : "outline"}
+              size="sm"
+              disabled={controlsDisabled}
+              onClick={() => setForcedSpeakerId(characterB.id)}
+            >
+              {getShortName(characterB)} luego {getShortName(characterA)}
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={controlsDisabled}
+              onClick={() => setForcedSpeakerId(characterA.id)}
+            >
+              Dar la palabra a {getShortName(characterA)}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={controlsDisabled}
+              onClick={() => setForcedSpeakerId(characterB.id)}
+            >
+              Dar la palabra a {getShortName(characterB)}
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={controlsDisabled}
+              onClick={() => handleSkip(characterA.id)}
+            >
+              <MicOff className="h-4 w-4 mr-1" />
+              {getShortName(characterA)} pasa turno
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={controlsDisabled}
+              onClick={() => handleSkip(characterB.id)}
+            >
+              <MicOff className="h-4 w-4 mr-1" />
+              {getShortName(characterB)} pasa turno
+            </Button>
+          </div>
+        </div>
+
         <p className="text-xs text-muted-foreground mb-2 text-center">Moderado por: Tú</p>
         <div className="flex gap-2">
           <Input
@@ -210,13 +301,13 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="Escribe una pregunta al debate..."
-            disabled={!isConnected || isSending}
+            disabled={controlsDisabled}
             className="flex-1"
           />
           <Button
             size="icon"
             onClick={handleSend}
-            disabled={!isConnected || isSending || !inputValue.trim()}
+            disabled={controlsDisabled || !inputValue.trim()}
           >
             <Send className="h-4 w-4" />
           </Button>

@@ -72,7 +72,14 @@ export interface SuggestionsPayload {
   suggestions: string[]
 }
 
-export type DebateTurnOrder = "A" | "B"
+export type DebateTurnOrder = "A" | "B" | "forced"
+
+export type DebateSkipReason =
+  | "manual_user"
+  | "auto_low_confidence"
+  | "not_applicable"
+  | "strategy"
+  | "unknown"
 
 export interface DebateWarningPayload {
   code: string
@@ -85,6 +92,11 @@ export interface DebateMessageMetadata extends Record<string, unknown> {
   debateTraceId?: string
   turnOrder?: DebateTurnOrder | null
   warning?: DebateWarningPayload | null
+  isForced?: boolean
+  isSkipped?: boolean
+  skipReason?: DebateSkipReason
+  skipReasonDetail?: string | null
+  skipConfidence?: number | null
 }
 
 export interface DebateStartedPayload {
@@ -105,6 +117,7 @@ export interface DebateTypingPayload {
   speaker_id: string
   speaker_name: string
   turn_order: DebateTurnOrder
+  is_forced?: boolean
 }
 
 export interface DebateTurnPayload {
@@ -115,13 +128,29 @@ export interface DebateTurnPayload {
   speaker_id: string
   speaker_name: string
   turn_order: DebateTurnOrder
+  is_forced?: boolean
   audio?: string | null
   warning?: DebateWarningPayload | null
+}
+
+export interface DebateTurnSkippedPayload {
+  conversationId: string
+  traceId: string
+  speaker_id: string
+  speaker_name: string
+  turn_order: DebateTurnOrder
+  is_forced?: boolean
+  reason: DebateSkipReason
+  reason_detail?: string
+  confidence?: number
 }
 
 export interface DebateRoundCompletePayload {
   conversationId: string
   traceId: string
+  responses_count?: number
+  skips_count?: number
+  next_speaker_id?: string
   warnings?: DebateWarningPayload[]
 }
 

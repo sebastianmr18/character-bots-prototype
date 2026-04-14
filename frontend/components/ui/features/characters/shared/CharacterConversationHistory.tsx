@@ -34,7 +34,7 @@ export function CharacterConversationHistory({
       if (!response.ok) throw new Error(`Error HTTP ${response.status}`)
 
       const data: Conversation[] = await response.json()
-      const forThisCharacter = data.filter((conversation) => conversation.character?.id === character.id)
+      const forThisCharacter = data.filter((conversation) => conversation.character?.id === character.id || conversation.secondaryCharacter?.id === character.id)
       setConversations(forThisCharacter)
       setHasLoadedInitialHistory(true)
     } catch (error) {
