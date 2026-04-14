@@ -15,7 +15,7 @@ interface NavbarProps {
 export function Navbar({ transparent = false }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const pathname = usePathname()
-  const { user, logout } = useAuth()
+  const { user, isAdmin, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
 
   if (pathname.startsWith('/login') || pathname.startsWith('/auth')) {
@@ -51,6 +51,14 @@ export function Navbar({ transparent = false }: NavbarProps) {
               >
                 Personajes
               </Link>
+              {isAdmin ? (
+                <Link
+                  href="/uploads"
+                  className="text-sm font-medium text-foreground/80 hover:text-foreground transition-colors"
+                >
+                  Uploads
+                </Link>
+              ) : null}
               <Link
                 href="/#modos"
                 className="text-sm font-medium text-foreground/80 hover:text-foreground transition-colors"
@@ -123,6 +131,15 @@ export function Navbar({ transparent = false }: NavbarProps) {
                 >
                   Personajes
                 </Link>
+                {isAdmin ? (
+                  <Link
+                    href="/uploads"
+                    className="text-sm font-medium text-foreground/80 hover:text-foreground transition-colors"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Uploads
+                  </Link>
+                ) : null}
                 <Link
                   href="/#modos"
                   className="text-sm font-medium text-foreground/80 hover:text-foreground transition-colors"

@@ -196,3 +196,22 @@ export interface StatusDisplayConfig {
   icon: string
   bg: string
 }
+
+export interface CharacterKnowledgeBaseUploadResponse {
+  message: string
+  characterId: string
+  collectionName: string
+  fileName: string
+  mimeType: string
+  chunksIndexed: number
+  indexedAt: string
+}
+
+export type UserRole = 'admin' | 'user'
+
+export interface MeProfile {
+  id: string
+  username: string
+  role: UserRole
+  createdAt: string
+}
