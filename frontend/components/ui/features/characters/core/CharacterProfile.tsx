@@ -134,7 +134,7 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
         <div
           className={cn(
             'border-r border-border overflow-hidden flex flex-col transition-all duration-300',
-            isHistoryOpen ? 'w-[40%]' : 'w-[40%]'
+            isHistoryOpen ? 'w-[40%]' : 'w-[55%]'
           )}
         >
           <CharacterContextPanel character={character} />

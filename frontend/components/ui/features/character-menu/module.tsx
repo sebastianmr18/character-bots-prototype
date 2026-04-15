@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import type { Character } from '@/types/chat.types'
@@ -78,10 +79,13 @@ export default function ChatsConversationsPage() {
               >
                 <div className="h-80 relative overflow-hidden">
                   {character.imageUrl ? (
-                    <img
+                    <Image
                       src={character.imageUrl}
                       alt={character.name}
-                      className="w-full h-full object-cover"
+                      fill
+                      unoptimized
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      className="object-cover"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none'
                       }}

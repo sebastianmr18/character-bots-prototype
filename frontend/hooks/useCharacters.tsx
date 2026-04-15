@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import type { Character } from "../types/chat.types"
+import type { Character } from "@/types/chat.types"
 import { normalizeBackendCharacters } from "@/utils/message.utils"
 
 export const useCharacters = (preselectedCharacterId?: string) => {
@@ -41,7 +41,7 @@ export const useCharacters = (preselectedCharacterId?: string) => {
     }
 
     fetchCharacters()
-  }, [])
+  }, [preselectedCharacterId])
 
   const handleCharacterChange = (newId: string) => {
     setSelectedCharacterId(newId)

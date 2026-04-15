@@ -6,7 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:deadcode": "npx --yes ts-prune",
+    "verify": "npm run lint && npm run build && npm run check:deadcode"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",

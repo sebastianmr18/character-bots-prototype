@@ -271,8 +271,6 @@ pyrightconfig.json
 
 *.md
 
-.cursorrules
-
 .next
 
 # End of https://www.toptal.com/developers/gitignore/api/python,django

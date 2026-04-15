@@ -1,6 +1,5 @@
 import type {
   CharacterEditorial,
-  CharacterEditorialResponse,
   CharacterEditorialSectionName,
   CharacterEditorialSectionResponse,
   EditorialBlock,
@@ -384,11 +383,4 @@ export const mergeEditorialContent = (
   galleryImages: mergeByKey(base.galleryImages, incoming.galleryImages, (image) => image.id),
   editorialBlocks: mergeByKey(base.editorialBlocks, incoming.editorialBlocks, (block) => block.id),
   uiCopies: mergeByKey(base.uiCopies, incoming.uiCopies, (copy) => `${copy.pageKey ?? ''}:${copy.copyKey}`),
-})
-
-export const normalizeBackendEditorialPayload = (
-  payload: BackendEditorialResponse,
-): CharacterEditorialResponse => ({
-  character: normalizeEditorialCharacter(payload.character),
-  editorial: normalizeEditorial(payload.editorial),
 })

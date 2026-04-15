@@ -162,15 +162,6 @@ export interface DebateErrorPayload {
   retryable: boolean
 }
 
-export interface WebSocketMessage {
-  type: "init" | "status" | "transcription_result" | "text_response" | "audio_response" | "error"
-  conversation_id?: string
-  character_id?: string
-  message?: string
-  text?: string
-  audio?: string
-}
-
 export interface AiMessagePayload {
   message_id?: number | string
   messageId?: number | string

@@ -1,32 +1,63 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { MessageSquare } from 'lucide-react';
 import type { Character } from '@/types/chat.types';
-import { EinsteinContextPanel } from '@/components/ui/features/characters/context-prototypes/einstein/EinsteinContextPanel';
+import type { EditorialCharacter } from '@/types/editorial.types';
+import { CharacterEditorialPanel } from '@/components/ui/features/characters/context-prototypes/editorial/CharacterEditorialPanel';
 import { useCharacterEditorialSection } from '@/hooks/useCharacterEditorialSection';
 import { createEmptyEditorial, mergeEditorialContent } from '@/utils/editorial.utils';
-import { colorFromName, lightColorFromName, toSlug } from '@/utils/character.utils';
+import { colorFromName, lightColorFromName } from '@/utils/character.utils';
 
 interface CharacterContextPanelProps {
     character: Character;
 }
 
+type LegacyEditorialCharacter = Character & {
+    image_url?: string | null
+    theme_color?: string | null
+    theme_color_light?: string | null
+    key_traits?: string[] | null
+    ambient_label?: string | null
+    content_variant?: string | null
+}
+
+function resolveEditorialCharacter(character: Character | EditorialCharacter): EditorialCharacter {
+    const legacyCharacter = character as LegacyEditorialCharacter
+
+    return {
+        ...character,
+        imageUrl: character.imageUrl ?? legacyCharacter.image_url ?? null,
+        themeColor: character.themeColor ?? legacyCharacter.theme_color ?? null,
+        themeColorLight: character.themeColorLight ?? legacyCharacter.theme_color_light ?? null,
+        keyTraits: (character as EditorialCharacter).keyTraits ?? legacyCharacter.key_traits ?? character.topics ?? null,
+        ambientLabel: (character as EditorialCharacter).ambientLabel ?? legacyCharacter.ambient_label ?? character.years ?? null,
+        contentVariant: (character as EditorialCharacter).contentVariant ?? legacyCharacter.content_variant ?? null,
+    }
+}
+
+function hasEditorialVariant(character: Character | EditorialCharacter): boolean {
+    const editorialCharacter = character as EditorialCharacter & { content_variant?: string | null }
+    const variant = editorialCharacter.contentVariant ?? editorialCharacter.content_variant
+    return variant === 'editorial'
+}
+
 export function CharacterContextPanel({
     character,
 }: CharacterContextPanelProps) {
-    const isEinsteinPrototype = toSlug(character.name) === 'albert-einstein'
+    const isEditorialCharacter = hasEditorialVariant(character)
     const { data: heroData, isLoading: isEditorialLoading, error: editorialError } = useCharacterEditorialSection(
         character.id,
         'hero',
-        isEinsteinPrototype,
+        isEditorialCharacter,
     )
     const heroEditorial = mergeEditorialContent(createEmptyEditorial(), heroData?.editorial ?? {})
     const editorialCharacter = heroData?.character ?? null
-    const resolvedCharacter = editorialCharacter ?? character
+    const resolvedCharacter = resolveEditorialCharacter(editorialCharacter ?? character)
     const themeColor = resolvedCharacter.themeColor ?? colorFromName(resolvedCharacter.name)
     const themeColorLight = resolvedCharacter.themeColorLight ?? lightColorFromName(resolvedCharacter.name)
-    const characterImageUrl = resolvedCharacter.imageUrl ?? (resolvedCharacter as Character & { image_url?: string | null }).image_url ?? null;
+    const characterImageUrl = resolvedCharacter.imageUrl ?? null;
     const backgroundImageUrl = resolvedCharacter.backgroundImageUrl ?? null;
     const [avatarImageError, setAvatarImageError] = useState(false);
 
@@ -34,7 +65,7 @@ export function CharacterContextPanel({
         setAvatarImageError(false);
     }, [characterImageUrl]);
 
-    if (isEinsteinPrototype) {
+    if (isEditorialCharacter) {
         if (editorialError) {
             return (
                 <div className="flex h-full items-center justify-center px-6 py-10">
@@ -49,7 +80,7 @@ export function CharacterContextPanel({
         }
 
         return (
-            <EinsteinContextPanel
+            <CharacterEditorialPanel
                 character={resolvedCharacter}
                 heroEditorial={heroEditorial}
                 themeColor={themeColor}
@@ -93,10 +124,13 @@ export function CharacterContextPanel({
                         style={{ backgroundColor: themeColor }}
                     >
                         {characterImageUrl && !avatarImageError ? (
-                            <img
+                            <Image
                                 src={characterImageUrl}
                                 alt={resolvedCharacter.name}
-                                className="w-full h-full object-cover"
+                                fill
+                                unoptimized
+                                sizes="160px"
+                                className="object-cover"
                                 onError={() => setAvatarImageError(true)}
                             />
                         ) : (
