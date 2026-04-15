@@ -134,6 +134,17 @@ const buildSkippedTurnMessage = (payload: DebateTurnSkippedPayload): Message => 
   )
 }
 
+const getDebateErrorMessage = (payload: DebateErrorPayload): string => {
+  const fallbackByCode: Record<string, string> = {
+    NO_SPEECH: "No se detectó voz. Intenta grabar de nuevo.",
+    STT_FAILED: "No se pudo transcribir el audio. Intenta nuevamente.",
+    AUDIO_UPLOAD_FAILED: "Falló el envío del audio. Reintenta en unos segundos.",
+    INVALID_AUDIO_PAYLOAD: "El audio enviado no es válido. Vuelve a grabarlo.",
+  }
+
+  return payload.message?.trim() || fallbackByCode[payload.code] || "Ocurrió un error en la ronda de debate."
+}
+
 export const useDebateWebSocket = ({
   conversationId,
   onStatusChange,
@@ -145,6 +156,7 @@ export const useDebateWebSocket = ({
   const activeRoundTextRef = useRef<string | null>(null)
   const lastSubmittedTextRef = useRef<string | null>(null)
   const lastRetryableTextRef = useRef<string | null>(null)
+  const lastSubmissionKindRef = useRef<"text" | "audio" | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [errorState, setErrorState] = useState<DebateErrorPayload | null>(null)
@@ -165,6 +177,7 @@ export const useDebateWebSocket = ({
     activeRoundTextRef.current = null
     setTypingCharacterId(null)
     setIsSending(false)
+    lastSubmissionKindRef.current = null
 
     if (clearRetryText) {
       lastRetryableTextRef.current = null
@@ -181,6 +194,8 @@ export const useDebateWebSocket = ({
       activeRoundTraceIdRef.current = null
       activeRoundTextRef.current = trimmedText
       lastSubmittedTextRef.current = trimmedText
+      lastRetryableTextRef.current = null
+      lastSubmissionKindRef.current = "text"
       setErrorState(null)
       setTypingCharacterId(null)
       setIsSending(true)
@@ -188,6 +203,33 @@ export const useDebateWebSocket = ({
       socketRef.current.emit("send_debate_text", {
         conversationId,
         text: trimmedText,
+        forced_speaker_id: forcedSpeakerId ?? null,
+      })
+      return true
+    },
+    [conversationId, isConnected, isSending, onStatusChange],
+  )
+
+  const emitDebateAudio = useCallback(
+    (audioBase64: string, mimeType = "audio/webm", forcedSpeakerId?: string | null) => {
+      const trimmedAudio = audioBase64.trim()
+      if (!trimmedAudio || !socketRef.current || !isConnected || !conversationId || isSending) {
+        return false
+      }
+
+      activeRoundTraceIdRef.current = null
+      activeRoundTextRef.current = null
+      lastSubmittedTextRef.current = null
+      lastRetryableTextRef.current = null
+      lastSubmissionKindRef.current = "audio"
+      setErrorState(null)
+      setTypingCharacterId(null)
+      setIsSending(true)
+      onStatusChange("Enviando audio...")
+      socketRef.current.emit("send_debate_audio", {
+        conversationId,
+        audioBase64: trimmedAudio,
+        mimeType,
         forced_speaker_id: forcedSpeakerId ?? null,
       })
       return true
@@ -296,13 +338,18 @@ export const useDebateWebSocket = ({
         activeRoundTraceIdRef.current = data.traceId
         setErrorState(null)
         onStatusChange("Esperando respuestas...")
+        const fallbackUserText =
+          lastSubmissionKindRef.current === "audio"
+            ? "🎤 Audio enviado"
+            : activeRoundTextRef.current ?? lastSubmittedTextRef.current ?? ""
+        const userText = data.user_text?.trim() || fallbackUserText
         setMessages((prev) =>
           upsertMessagesById(prev, [
             createTraceScopedMessage(
               {
                 id: data.user_message_id,
                 role: "user",
-                content: data.user_text,
+                content: userText,
               },
               data.traceId,
               {
@@ -356,12 +403,14 @@ export const useDebateWebSocket = ({
       socket.on("debate_error", (data: DebateErrorPayload) => {
         const failedTraceId = activeRoundTraceIdRef.current ?? data.traceId
         const failedText = activeRoundTextRef.current ?? lastSubmittedTextRef.current
+        const failedSubmissionKind = lastSubmissionKindRef.current
+        const message = getDebateErrorMessage(data)
 
         if (failedTraceId) {
           setMessages((prev) => removeMessagesByTraceId(prev, failedTraceId))
         }
 
-        if (data.retryable && failedText) {
+        if (failedSubmissionKind === "text" && data.retryable && failedText) {
           lastRetryableTextRef.current = failedText
         } else {
           lastRetryableTextRef.current = null
@@ -369,7 +418,10 @@ export const useDebateWebSocket = ({
 
         clearRoundState(false)
         onStatusChange("Error")
-        setErrorState(data)
+        setErrorState({
+          ...data,
+          message,
+        })
         console.error("Debate error:", data)
       })
 
@@ -411,9 +463,16 @@ export const useDebateWebSocket = ({
 
   const sendDebateMessage = useCallback(
     (text: string, forcedSpeakerId?: string | null) => {
-      void emitDebateMessage(text, forcedSpeakerId)
+      return emitDebateMessage(text, forcedSpeakerId)
     },
     [emitDebateMessage],
+  )
+
+  const sendDebateAudio = useCallback(
+    (audioBase64: string, mimeType = "audio/webm", forcedSpeakerId?: string | null) => {
+      return emitDebateAudio(audioBase64, mimeType, forcedSpeakerId)
+    },
+    [emitDebateAudio],
   )
 
   const skipDebateTurn = useCallback(
@@ -433,6 +492,7 @@ export const useDebateWebSocket = ({
     messages,
     setMessages,
     sendDebateMessage,
+    sendDebateAudio,
     skipDebateTurn,
     retryLastMessage,
     isConnected,

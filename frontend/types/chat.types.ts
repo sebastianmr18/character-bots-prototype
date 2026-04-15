@@ -108,7 +108,7 @@ export interface DebateUserAckPayload {
   conversationId: string
   traceId: string
   user_message_id: number | string
-  user_text: string
+  user_text?: string | null
 }
 
 export interface DebateTypingPayload {

@@ -2,12 +2,14 @@
 
 import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
-import { ArrowLeft, MicOff, Send, Swords } from "lucide-react"
+import { ArrowLeft, Mic, MicOff, Send, Swords } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StatusIndicator } from "@/components/ui/features/characters/shared/StatusIndicator"
 import { DebateChatMessages } from "@/components/ui/features/characters/modes/debate/DebateChatMessages"
+import { VoiceRecordingModal } from "@/components/ui/features/characters/shared/VoiceRecordingModal"
 import { useDebateWebSocket } from "@/hooks/useDebateWebSocket"
+import { useVoiceRecording } from "@/hooks/useVoiceRecording"
 import type { Character, Message } from "@/types/chat.types"
 import { normalizeBackendMessages } from "@/utils/message.utils"
 import { colorFromName } from "@/utils/character.utils"
@@ -34,6 +36,8 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
   const [status, setStatus] = useState("Conectando...")
   const [inputValue, setInputValue] = useState("")
   const [forcedSpeakerId, setForcedSpeakerId] = useState<string | null>(null)
+  const [showVoiceModal, setShowVoiceModal] = useState(false)
+  const [isSendingAudio, setIsSendingAudio] = useState(false)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -53,6 +57,7 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
     messages,
     setMessages,
     sendDebateMessage,
+    sendDebateAudio,
     skipDebateTurn,
     retryLastMessage,
     isConnected,
@@ -65,6 +70,9 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
     onStatusChange: setStatus,
     fetchConversationMessages: loadHistory,
   })
+
+  const { isRecording, audioLevel, startRecording, stopRecording, errorMessage, clearError } =
+    useVoiceRecording()
 
   // Load history whenever conversation changes.
   useEffect(() => {
@@ -88,6 +96,19 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
   useEffect(() => {
     setForcedSpeakerId(null)
   }, [conversationId])
+
+  useEffect(() => {
+    if (!isSending) {
+      setIsSendingAudio(false)
+    }
+  }, [isSending])
+
+  useEffect(() => {
+    if (!errorMessage) return
+
+    setStatus(errorMessage)
+    setShowVoiceModal(false)
+  }, [errorMessage])
 
   // Auto-scroll on new messages
   const scrollToBottom = useCallback(() => {
@@ -115,7 +136,69 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
     skipDebateTurn(speakerId, "manual_user")
   }
 
-  const controlsDisabled = !isConnected || isSending
+  const handleToggleRecording = async () => {
+    if (!isConnected || isSending || isSendingAudio) return
+
+    try {
+      if (isRecording) {
+        setStatus("Procesando audio...")
+        setIsSendingAudio(true)
+
+        const base64Data = await stopRecording()
+        setShowVoiceModal(false)
+
+        if (!base64Data) {
+          setIsSendingAudio(false)
+          setStatus("No se pudo capturar audio")
+          return
+        }
+
+        const didSend = sendDebateAudio(base64Data, "audio/webm", forcedSpeakerId)
+
+        if (didSend) {
+          setForcedSpeakerId(null)
+          setStatus("Enviando audio...")
+          return
+        }
+
+        setIsSendingAudio(false)
+        setStatus("No se pudo enviar el audio")
+        return
+      }
+
+      clearError()
+      const didStartRecording = await startRecording()
+      if (!didStartRecording) {
+        setShowVoiceModal(false)
+        return
+      }
+
+      setStatus("Grabando voz...")
+      setShowVoiceModal(true)
+    } catch (error) {
+      console.error("Error al grabar audio en debate:", error)
+      setIsSendingAudio(false)
+      setShowVoiceModal(false)
+      setStatus("Error en grabación")
+    }
+  }
+
+  const handleCloseVoiceModal = async () => {
+    if (isRecording) {
+      try {
+        await stopRecording()
+      } catch (error) {
+        console.error("Error al cancelar grabación de debate:", error)
+      }
+    }
+
+    clearError()
+    setShowVoiceModal(false)
+    setIsSendingAudio(false)
+    setStatus("Listo")
+  }
+
+  const controlsDisabled = !isConnected || isSending || isSendingAudio || showVoiceModal
 
   const colorA = getThemeColor(characterA)
   const colorB = getThemeColor(characterB)
@@ -305,6 +388,16 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
             className="flex-1"
           />
           <Button
+            type="button"
+            size="icon"
+            variant={isRecording ? "destructive" : "outline"}
+            onClick={() => void handleToggleRecording()}
+            disabled={!isConnected || isSending || isSendingAudio || showVoiceModal}
+            aria-label={isRecording ? "Detener grabación" : "Grabar audio para el debate"}
+          >
+            <Mic className="h-4 w-4" />
+          </Button>
+          <Button
             size="icon"
             onClick={handleSend}
             disabled={controlsDisabled || !inputValue.trim()}
@@ -312,7 +405,18 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
             <Send className="h-4 w-4" />
           </Button>
         </div>
+        {errorMessage && (
+          <p className="mt-2 text-xs text-destructive">{errorMessage}</p>
+        )}
       </div>
+
+      <VoiceRecordingModal
+        isOpen={showVoiceModal && !errorMessage}
+        isRecording={isRecording}
+        audioLevel={audioLevel}
+        onClose={() => void handleCloseVoiceModal()}
+        onToggleRecording={() => void handleToggleRecording()}
+      />
     </div>
   )
 }
