@@ -133,6 +133,14 @@ export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
                     Forzado
                   </span>
                 )}
+                {debateMetadata?.speakerInferenceMethod === "text_mention" && (
+                  <span
+                    className="rounded-full border border-emerald-300/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300"
+                    title={debateMetadata?.speakerMentionText ? `Mención: "${debateMetadata.speakerMentionText}"` : "Detectado por mención"}
+                  >
+                    🎯 Detectado
+                  </span>
+                )}
               </div>
 
               {/* Bubble */}

@@ -102,6 +102,9 @@ const buildTurnMessage = (payload: DebateTurnPayload): Message => {
       turnOrder: payload.turn_order,
       isForced: payload.is_forced ?? false,
       warning: payload.warning ?? null,
+      speakerInferenceMethod: payload.inference_method,
+      speakerMentionText: payload.detected_mention_text,
+      speakerMentionConfidence: payload.mention_confidence,
     },
   )
 }

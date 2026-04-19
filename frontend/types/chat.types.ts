@@ -76,6 +76,12 @@ export interface SuggestionsPayload {
 
 export type DebateTurnOrder = "A" | "B" | "forced"
 
+export type DebateSpeakerSelectionMethod =
+  | "explicit_forced"
+  | "text_mention"
+  | "fallback_next_speaker"
+  | "manual_mode"
+
 export type DebateSkipReason =
   | "manual"
   | "manual_user"
@@ -100,6 +106,9 @@ export interface DebateMessageMetadata extends Record<string, unknown> {
   skipReason?: DebateSkipReason
   skipReasonDetail?: string | null
   skipConfidence?: number | null
+  speakerInferenceMethod?: DebateSpeakerSelectionMethod
+  speakerMentionText?: string
+  speakerMentionConfidence?: number
 }
 
 export interface DebateStartedPayload {
@@ -132,6 +141,9 @@ export interface DebateTurnPayload {
   speaker_name: string
   turn_order: DebateTurnOrder
   is_forced?: boolean
+  inference_method?: DebateSpeakerSelectionMethod
+  detected_mention_text?: string
+  mention_confidence?: number
   audio?: string | null
   warning?: DebateWarningPayload | null
 }
@@ -159,6 +171,10 @@ export interface DebateRoundCompletePayload {
   responses_count?: number
   skips_count?: number
   next_speaker_id?: string
+  inference_method?: DebateSpeakerSelectionMethod
+  selected_speaker_id?: string
+  detected_mention_text?: string
+  mention_confidence?: number
   warnings?: DebateWarningPayload[]
 }
 
