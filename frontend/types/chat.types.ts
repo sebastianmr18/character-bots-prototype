@@ -19,8 +19,10 @@ export type MessageBlock = TextBlock | ComponentBlock
 
 export interface Message {
   id: number | string
-  role: "user" | "assistant" | "system"
+  role: "user" | "assistant" | "system" | "event"
   content: string
+  eventType?: string
+  eventMetaJson?: Record<string, unknown>
   schemaVersion?: MessageSchemaVersion
   blocks?: MessageBlock[]
   metadata?: Record<string, unknown>
@@ -75,6 +77,7 @@ export interface SuggestionsPayload {
 export type DebateTurnOrder = "A" | "B" | "forced"
 
 export type DebateSkipReason =
+  | "manual"
   | "manual_user"
   | "auto_low_confidence"
   | "not_applicable"
@@ -136,11 +139,16 @@ export interface DebateTurnPayload {
 export interface DebateTurnSkippedPayload {
   conversationId: string
   traceId: string
+  message_id?: number
+  speakerId?: string
+  speakerName?: string
   speaker_id: string
   speaker_name: string
   turn_order: DebateTurnOrder
+  turnOrder?: number
   is_forced?: boolean
   reason: DebateSkipReason
+  reasonDetail?: string
   reason_detail?: string
   confidence?: number
 }

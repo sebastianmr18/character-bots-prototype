@@ -56,9 +56,37 @@ export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
         ? characterB
         : null
 
+  const skipReasonLabel = (reason: string | undefined): string => {
+    if (reason === "manual" || reason === "manual_user") return "el usuario lo omitió"
+    if (reason === "auto_low_confidence") return "baja confianza"
+    return "motivo desconocido"
+  }
+
   return (
     <>
       {messages.map((message) => {
+        if (message.role === "event" && message.eventType === "debate_turn_skip") {
+          const meta = message.eventMetaJson
+          const name = (meta?.speakerName as string | undefined) ?? message.speakerName ?? "Personaje"
+          const reason = (meta?.reason as string | undefined)
+          const reasonDetail = (meta?.reasonDetail as string | undefined)
+          return (
+            <div key={String(message.id)} className="flex justify-center">
+              <div
+                className="flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 py-1 text-xs text-muted-foreground"
+                title={reasonDetail ?? undefined}
+              >
+                <span>⏭</span>
+                <span>
+                  <span className="font-medium">{name}</span>
+                  {" omitió su turno"}
+                  {reason ? ` — ${skipReasonLabel(reason)}` : ""}
+                </span>
+              </div>
+            </div>
+          )
+        }
+
         if (message.role === "user") {
           return (
             <div key={String(message.id)} className="flex justify-center">

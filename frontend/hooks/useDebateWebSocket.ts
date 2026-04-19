@@ -107,18 +107,23 @@ const buildTurnMessage = (payload: DebateTurnPayload): Message => {
 }
 
 const buildSkippedTurnMessage = (payload: DebateTurnSkippedPayload): Message => {
-  const reasonDetail = payload.reason_detail?.trim()
+  const speakerId = payload.speaker_id ?? payload.speakerId ?? ""
+  const speakerName = payload.speaker_name ?? payload.speakerName ?? ""
+  const reason = payload.reason
+  const reasonDetail = (payload.reason_detail ?? payload.reasonDetail)?.trim()
   const content = reasonDetail
-    ? `${payload.speaker_name} ha pasado su turno. (${reasonDetail})`
-    : `${payload.speaker_name} ha pasado su turno.`
+    ? `${speakerName} ha pasado su turno. (${reasonDetail})`
+    : `${speakerName} ha pasado su turno.`
+
+  const id = payload.message_id ?? `skip_${payload.traceId}_${speakerId}_${reason}`
 
   return createTraceScopedMessage(
     {
-      id: `skip_${payload.traceId}_${payload.speaker_id}_${payload.reason}`,
+      id,
       role: "assistant",
       content,
-      speakerId: payload.speaker_id,
-      speakerName: payload.speaker_name,
+      speakerId,
+      speakerName,
       audioUrl: null,
       mediaType: null,
     },
@@ -127,8 +132,8 @@ const buildSkippedTurnMessage = (payload: DebateTurnSkippedPayload): Message => 
       turnOrder: payload.turn_order,
       isForced: payload.is_forced ?? false,
       isSkipped: true,
-      skipReason: payload.reason,
-      skipReasonDetail: payload.reason_detail ?? null,
+      skipReason: reason,
+      skipReasonDetail: reasonDetail ?? null,
       skipConfidence: payload.confidence ?? null,
       warning: null,
     },
@@ -171,9 +176,41 @@ export const useDebateWebSocket = ({
     if (!fetchConversationMessages) return
 
     const historicalMessages = await fetchConversationMessages()
-    if (historicalMessages) {
-      setMessages(historicalMessages)
-    }
+    if (!historicalMessages) return
+
+    setMessages((prev) => {
+      // Merge historical messages into current state via upsert (deduplicates by id)
+      const merged = upsertMessagesById(prev, historicalMessages)
+      // Remove orphan temporary skip messages (id starts with "skip_") that now
+      // have a persisted equivalent (id is a number) from the history.
+      const persistedIds = new Set(
+        historicalMessages
+          .filter((m) => m.role === "event" || typeof m.id === "number")
+          .map((m) => String(m.id)),
+      )
+      return merged.filter((m) => {
+        if (typeof m.id === "string" && m.id.startsWith("skip_")) {
+          const meta = m.metadata as DebateMessageMetadata | undefined
+          const traceId = meta?.debateTraceId
+          const speakerId = m.speakerId
+          // Keep the temporary message only if there is no persisted event for
+          // the same speaker in the same trace (i.e. backend did not persist it yet).
+          const hasPersisted = historicalMessages.some(
+            (h) =>
+              h.role === "event" &&
+              h.eventType === "debate_turn_skip" &&
+              ((h.eventMetaJson?.speakerId === speakerId) ||
+               (h.speakerId === speakerId)) &&
+              (traceId == null ||
+               (h.metadata as DebateMessageMetadata | undefined)?.debateTraceId === traceId ||
+               // persisted events don't carry traceId in metadata, check reconciled ids
+               persistedIds.has(String(h.id))),
+          )
+          return !hasPersisted
+        }
+        return true
+      })
+    })
   }, [fetchConversationMessages])
 
   const clearRoundState = useCallback((clearRetryText = false) => {

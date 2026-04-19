@@ -29,8 +29,12 @@ type BackendMessageBlock = BackendTextBlock | BackendComponentBlock
 
 type BackendMessage = {
   id: number | string
-  role: "user" | "assistant" | "system"
+  role: "user" | "assistant" | "system" | "event"
   content?: string
+  eventType?: string
+  event_type?: string
+  eventMetaJson?: Record<string, unknown>
+  event_meta_json?: Record<string, unknown>
   schemaVersion?: MessageSchemaVersion
   schema_version?: MessageSchemaVersion
   blocks?: BackendMessageBlock[]
@@ -159,6 +163,10 @@ const normalizeBackendMessage = (message: BackendMessage): Message => {
     id: message.id,
     role: message.role,
     content: message.content ?? blocksToTextFallback(normalizedBlocks),
+    eventType: message.eventType ?? message.event_type,
+    eventMetaJson: sanitizeValue(
+      message.eventMetaJson ?? message.event_meta_json,
+    ) as Record<string, unknown> | undefined,
     schemaVersion: message.schemaVersion ?? message.schema_version,
     blocks: normalizedBlocks,
     metadata: sanitizeValue(message.metadata) as Record<string, unknown> | undefined,
