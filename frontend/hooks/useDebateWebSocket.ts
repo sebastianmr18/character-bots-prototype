@@ -14,6 +14,7 @@ import type {
   DebateTypingPayload,
   DebateUserAckPayload,
   Message,
+  SuggestionsPayload,
 } from "@/types/chat.types"
 import { base64ToObjectUrl } from "@/utils/live-audio.utils"
 import { createClient } from "@/lib/supabase/client"
@@ -161,7 +162,10 @@ export const useDebateWebSocket = ({
   const [isSending, setIsSending] = useState(false)
   const [errorState, setErrorState] = useState<DebateErrorPayload | null>(null)
   const [typingCharacterId, setTypingCharacterId] = useState<string | null>(null)
+  const [hasSkipInActiveRound, setHasSkipInActiveRound] = useState(false)
+  const [skipLockedBySpeakerId, setSkipLockedBySpeakerId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
+  const [suggestions, setSuggestions] = useState<string[]>([])
 
   const reconcileHistory = useCallback(async () => {
     if (!fetchConversationMessages) return
@@ -199,6 +203,7 @@ export const useDebateWebSocket = ({
       setErrorState(null)
       setTypingCharacterId(null)
       setIsSending(true)
+      setSuggestions([])
       onStatusChange("Esperando confirmación...")
       socketRef.current.emit("send_debate_text", {
         conversationId,
@@ -225,6 +230,7 @@ export const useDebateWebSocket = ({
       setErrorState(null)
       setTypingCharacterId(null)
       setIsSending(true)
+      setSuggestions([])
       onStatusChange("Enviando audio...")
       socketRef.current.emit("send_debate_audio", {
         conversationId,
@@ -240,9 +246,19 @@ export const useDebateWebSocket = ({
   const emitSkipDebateTurn = useCallback(
     (speakerId: string, reason?: string) => {
       const trimmedSpeakerId = speakerId.trim()
-      if (!trimmedSpeakerId || !socketRef.current || !isConnected || !conversationId || isSending) {
+      if (
+        !trimmedSpeakerId ||
+        !socketRef.current ||
+        !isConnected ||
+        !conversationId ||
+        isSending ||
+        hasSkipInActiveRound
+      ) {
         return false
       }
+
+      setHasSkipInActiveRound(true)
+      setSkipLockedBySpeakerId(trimmedSpeakerId)
 
       socketRef.current.emit("skip_debate_turn", {
         conversationId,
@@ -252,13 +268,16 @@ export const useDebateWebSocket = ({
 
       return true
     },
-    [conversationId, isConnected, isSending],
+    [conversationId, hasSkipInActiveRound, isConnected, isSending],
   )
 
   useEffect(() => {
     setMessages([])
     setErrorState(null)
     setTypingCharacterId(null)
+    setHasSkipInActiveRound(false)
+    setSkipLockedBySpeakerId(null)
+    setSuggestions([])
     clearRoundState(true)
   }, [clearRoundState, conversationId])
 
@@ -387,6 +406,8 @@ export const useDebateWebSocket = ({
 
         activeRoundTraceIdRef.current = data.traceId
         setTypingCharacterId(null)
+        setHasSkipInActiveRound(true)
+        setSkipLockedBySpeakerId(data.speaker_id)
         setMessages((prev) => upsertMessagesById(prev, [buildSkippedTurnMessage(data)]))
         onStatusChange("Esperando siguiente respuesta...")
       })
@@ -395,9 +416,27 @@ export const useDebateWebSocket = ({
         if (data.conversationId !== conversationId) return
 
         clearRoundState(true)
+        setHasSkipInActiveRound(false)
+        setSkipLockedBySpeakerId(null)
         setErrorState(null)
         onStatusChange("Listo")
         void reconcileHistory()
+      })
+
+      socket.on("suggestions", (data: SuggestionsPayload) => {
+        if (data.conversationId !== conversationId) return
+        
+        const receivedSuggestions = data.suggestions ?? []
+        if (!Array.isArray(receivedSuggestions) || receivedSuggestions.length !== 3) {
+          return
+        }
+
+        setSuggestions((prev) => {
+          const joinedPrev = prev.join("|")
+          const joinedNext = receivedSuggestions.join("|")
+          if (joinedPrev === joinedNext) return prev
+          return receivedSuggestions
+        })
       })
 
       socket.on("debate_error", (data: DebateErrorPayload) => {
@@ -417,6 +456,8 @@ export const useDebateWebSocket = ({
         }
 
         clearRoundState(false)
+        setHasSkipInActiveRound(false)
+        setSkipLockedBySpeakerId(null)
         onStatusChange("Error")
         setErrorState({
           ...data,
@@ -427,6 +468,9 @@ export const useDebateWebSocket = ({
 
       socket.on("disconnect", () => {
         clearRoundState(false)
+        setHasSkipInActiveRound(false)
+        setSkipLockedBySpeakerId(null)
+        setSuggestions([])
         onStatusChange("Desconectado")
         setIsConnected(false)
       })
@@ -499,6 +543,9 @@ export const useDebateWebSocket = ({
     isSending,
     errorState,
     typingCharacterId,
+    suggestions,
     canRetry: Boolean(errorState?.retryable && lastRetryableTextRef.current),
+    hasSkipInActiveRound,
+    skipLockedBySpeakerId,
   }
 }

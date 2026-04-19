@@ -64,7 +64,10 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
     isSending,
     errorState,
     typingCharacterId,
+    suggestions,
     canRetry,
+    hasSkipInActiveRound,
+    skipLockedBySpeakerId,
   } = useDebateWebSocket({
     conversationId,
     onStatusChange: setStatus,
@@ -125,6 +128,12 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
     if (!inputValue.trim() || !isConnected || isSending) return
     sendDebateMessage(inputValue.trim(), forcedSpeakerId)
     setInputValue("")
+    setForcedSpeakerId(null)
+  }
+
+  const handleSuggestionClick = (suggestion: string) => {
+    if (!isConnected || isSending) return
+    sendDebateMessage(suggestion, forcedSpeakerId)
     setForcedSpeakerId(null)
   }
 
@@ -199,6 +208,13 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
   }
 
   const controlsDisabled = !isConnected || isSending || isSendingAudio || showVoiceModal
+  const skipControlsDisabled = controlsDisabled || hasSkipInActiveRound
+  const skippedSpeakerName =
+    skipLockedBySpeakerId === characterA.id
+      ? getShortName(characterA)
+      : skipLockedBySpeakerId === characterB.id
+        ? getShortName(characterB)
+        : null
 
   const colorA = getThemeColor(characterA)
   const colorB = getThemeColor(characterB)
@@ -358,7 +374,7 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
               type="button"
               variant="ghost"
               size="sm"
-              disabled={controlsDisabled}
+              disabled={skipControlsDisabled}
               onClick={() => handleSkip(characterA.id)}
             >
               <MicOff className="h-4 w-4 mr-1" />
@@ -368,16 +384,39 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
               type="button"
               variant="ghost"
               size="sm"
-              disabled={controlsDisabled}
+              disabled={skipControlsDisabled}
               onClick={() => handleSkip(characterB.id)}
             >
               <MicOff className="h-4 w-4 mr-1" />
               {getShortName(characterB)} pasa turno
             </Button>
           </div>
+
+          {hasSkipInActiveRound && (
+            <p className="text-xs text-muted-foreground">
+              {skippedSpeakerName
+                ? `${skippedSpeakerName} ya pasó su turno en esta ronda. Envía una intervención para continuar.`
+                : "Ya se pasó un turno en esta ronda. Envía una intervención para continuar."}
+            </p>
+          )}
         </div>
 
         <p className="text-xs text-muted-foreground mb-2 text-center">Moderado por: Tú</p>
+          {suggestions.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-1 mb-2">
+              {suggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  disabled={controlsDisabled}
+                  className="px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          )}
         <div className="flex gap-2">
           <Input
             value={inputValue}
