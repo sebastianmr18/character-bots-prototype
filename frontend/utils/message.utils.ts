@@ -29,8 +29,12 @@ type BackendMessageBlock = BackendTextBlock | BackendComponentBlock
 
 type BackendMessage = {
   id: number | string
-  role: "user" | "assistant"
+  role: "user" | "assistant" | "system" | "event"
   content?: string
+  eventType?: string
+  event_type?: string
+  eventMetaJson?: Record<string, unknown>
+  event_meta_json?: Record<string, unknown>
   schemaVersion?: MessageSchemaVersion
   schema_version?: MessageSchemaVersion
   blocks?: BackendMessageBlock[]
@@ -152,13 +156,17 @@ const blocksToTextFallback = (blocks: MessageBlock[] | undefined): string => {
     .trim()
 }
 
-export const normalizeBackendMessage = (message: BackendMessage): Message => {
+const normalizeBackendMessage = (message: BackendMessage): Message => {
   const normalizedBlocks = normalizeBackendBlocks(message.blocks)
 
   return {
     id: message.id,
     role: message.role,
     content: message.content ?? blocksToTextFallback(normalizedBlocks),
+    eventType: message.eventType ?? message.event_type,
+    eventMetaJson: sanitizeValue(
+      message.eventMetaJson ?? message.event_meta_json,
+    ) as Record<string, unknown> | undefined,
     schemaVersion: message.schemaVersion ?? message.schema_version,
     blocks: normalizedBlocks,
     metadata: sanitizeValue(message.metadata) as Record<string, unknown> | undefined,
@@ -281,6 +289,7 @@ export const mergeMessageCollection = (
 export const normalizeAiMessagePayload = (payload: AiMessagePayload): Message => {
   const messageText = payload.text ?? payload.content ?? ""
   const messageId = payload.message_id ?? payload.messageId ?? `ws-${Date.now()}`
+  const suggestions = payload.suggestions ?? payload.suggested_questions
 
   return normalizeBackendMessage({
     id: messageId,
@@ -295,6 +304,9 @@ export const normalizeAiMessagePayload = (payload: AiMessagePayload): Message =>
     audio_url: payload.audio_url,
     mediaType: payload.mediaType,
     media_type: payload.media_type,
-    metadata: payload.metadata,
+    metadata: {
+      ...(payload.metadata ?? {}),
+      ...(suggestions ? { suggestions } : {}),
+    },
   })
 }

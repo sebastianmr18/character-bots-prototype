@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, useCallback } from "react"
+import { useRef, useState, useCallback, useEffect } from "react"
 
 const AUDIO_MIME_TYPE = "audio/webm;codecs=opus"
 
@@ -20,11 +20,34 @@ export const useVoiceRecording = () => {
 
   const [isRecording, setIsRecording] = useState(false)
   const [audioLevel, setAudioLevel] = useState(0)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const startRecording = useCallback(async (): Promise<void> => {
+  const clearError = useCallback(() => setErrorMessage(null), [])
+
+  const cleanupResources = useCallback(() => {
+    if (animationFrameId.current !== null) {
+      cancelAnimationFrame(animationFrameId.current)
+      animationFrameId.current = null
+    }
+
+    analyser.current = null
+
+    if (mediaRecorder.current) {
+      mediaRecorder.current.ondataavailable = null
+      mediaRecorder.current.onstop = null
+      mediaRecorder.current.stream?.getTracks().forEach((track) => track.stop())
+      mediaRecorder.current = null
+    }
+
+    audioChunks.current = []
+    setIsRecording(false)
+    setAudioLevel(0)
+  }, [])
+
+  const startRecording = useCallback(async (): Promise<boolean> => {
     if (!navigator.mediaDevices) {
-      alert("Tu navegador no soporta grabación de audio.")
-      return
+      setErrorMessage("Tu navegador no soporta grabación de audio.")
+      return false
     }
 
     try {
@@ -49,9 +72,11 @@ export const useVoiceRecording = () => {
         animationFrameId.current = requestAnimationFrame(updateLevel)
       }
       updateLevel()
+      return true
     } catch (err) {
       console.error("Error al acceder al micrófono:", err)
-      alert("Necesitas dar permiso al micrófono o usar un navegador compatible con audio/webm;codecs=opus.")
+      setErrorMessage("Necesitas dar permiso al micrófono o usar un navegador compatible con audio/webm;codecs=opus.")
+      return false
     }
   }, [])
 
@@ -74,19 +99,23 @@ export const useVoiceRecording = () => {
 
         reader.readAsDataURL(audioBlob)
 
-        const stream = mediaRecorder.current?.stream
-        stream?.getTracks().forEach((track) => track.stop())
-
-        if (animationFrameId.current) {
-          cancelAnimationFrame(animationFrameId.current)
-        }
+        cleanupResources()
       }
 
       mediaRecorder.current.stop()
       setIsRecording(false)
       setAudioLevel(0)
     })
-  }, [])
+  }, [cleanupResources])
 
-  return { isRecording, audioLevel, startRecording, stopRecording }
+  useEffect(() => {
+    return () => {
+      if (mediaRecorder.current && mediaRecorder.current.state !== "inactive") {
+        mediaRecorder.current.stop()
+      }
+      cleanupResources()
+    }
+  }, [cleanupResources])
+
+  return { isRecording, audioLevel, startRecording, stopRecording, errorMessage, clearError }
 }

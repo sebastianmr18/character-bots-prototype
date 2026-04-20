@@ -47,7 +47,7 @@ export const useConversation = (initialConversationId: string | null, options: U
 
         setIsLoading(true)
         setSelectedCharacter(null)
-        setMessages([])
+        setMessages(prev => prev.filter(m => typeof m.id === 'number' && m.id < 0))
         setConversationMode(null)
         let isCancelled = false
 
@@ -78,7 +78,10 @@ export const useConversation = (initialConversationId: string | null, options: U
                 }
                 
                 setSelectedCharacter(normalizeBackendCharacter(data.character))
-                setMessages(normalizeBackendMessages(data.messages || []))
+                setMessages(prev => {
+                    const optimistic = prev.filter(m => typeof m.id === 'number' && m.id < 0)
+                    return [...normalizeBackendMessages(data.messages || []), ...optimistic]
+                })
 
             } catch (error) {
                 if (isCancelled) return

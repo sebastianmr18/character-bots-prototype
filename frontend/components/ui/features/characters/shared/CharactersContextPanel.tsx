@@ -1,60 +1,97 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { MessageSquare, Clock, Loader2 } from 'lucide-react';
-import type { Character, Conversation } from '@/types/chat.types';
+import { useEffect, useState } from 'react';
+import Image from 'next/image';
+import { MessageSquare } from 'lucide-react';
+import type { Character } from '@/types/chat.types';
+import type { EditorialCharacter } from '@/types/editorial.types';
+import { CharacterEditorialPanel } from '@/components/ui/features/characters/context-prototypes/editorial/CharacterEditorialPanel';
+import { useCharacterEditorialSection } from '@/hooks/useCharacterEditorialSection';
+import { createEmptyEditorial, mergeEditorialContent } from '@/utils/editorial.utils';
 import { colorFromName, lightColorFromName } from '@/utils/character.utils';
 
 interface CharacterContextPanelProps {
     character: Character;
-    onSelectConversation?: (conversation: { id: string; mode?: 'single' | 'debate' }) => void;
-    selectedConversationId?: string;
 }
 
-export function CharacterContextPanel({ character, onSelectConversation, selectedConversationId }: CharacterContextPanelProps) {
-    const themeColor = character.themeColor ?? colorFromName(character.name)
-    const themeColorLight = character.themeColorLight ?? lightColorFromName(character.name)
-    const characterImageUrl = character.imageUrl ?? (character as Character & { image_url?: string | null }).image_url ?? null;
-    const backgroundImageUrl = character.backgroundImageUrl ?? null;
-    const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [isLoadingConversations, setIsLoadingConversations] = useState(true);
+type LegacyEditorialCharacter = Character & {
+    image_url?: string | null
+    theme_color?: string | null
+    theme_color_light?: string | null
+    key_traits?: string[] | null
+    ambient_label?: string | null
+    content_variant?: string | null
+}
+
+function resolveEditorialCharacter(character: Character | EditorialCharacter): EditorialCharacter {
+    const legacyCharacter = character as LegacyEditorialCharacter
+
+    return {
+        ...character,
+        imageUrl: character.imageUrl ?? legacyCharacter.image_url ?? null,
+        themeColor: character.themeColor ?? legacyCharacter.theme_color ?? null,
+        themeColorLight: character.themeColorLight ?? legacyCharacter.theme_color_light ?? null,
+        keyTraits: (character as EditorialCharacter).keyTraits ?? legacyCharacter.key_traits ?? character.topics ?? null,
+        ambientLabel: (character as EditorialCharacter).ambientLabel ?? legacyCharacter.ambient_label ?? character.years ?? null,
+        contentVariant: (character as EditorialCharacter).contentVariant ?? legacyCharacter.content_variant ?? null,
+    }
+}
+
+function hasEditorialVariant(character: Character | EditorialCharacter): boolean {
+    const editorialCharacter = character as EditorialCharacter & { content_variant?: string | null }
+    const variant = editorialCharacter.contentVariant ?? editorialCharacter.content_variant
+    return variant === 'editorial'
+}
+
+export function CharacterContextPanel({
+    character,
+}: CharacterContextPanelProps) {
+    const isEditorialCharacter = hasEditorialVariant(character)
+    const { data: heroData, isLoading: isEditorialLoading, error: editorialError } = useCharacterEditorialSection(
+        character.id,
+        'hero',
+        isEditorialCharacter,
+    )
+    const heroEditorial = mergeEditorialContent(createEmptyEditorial(), heroData?.editorial ?? {})
+    const editorialCharacter = heroData?.character ?? null
+    const resolvedCharacter = resolveEditorialCharacter(editorialCharacter ?? character)
+    const themeColor = resolvedCharacter.themeColor ?? colorFromName(resolvedCharacter.name)
+    const themeColorLight = resolvedCharacter.themeColorLight ?? lightColorFromName(resolvedCharacter.name)
+    const characterImageUrl = resolvedCharacter.imageUrl ?? null;
+    const backgroundImageUrl = resolvedCharacter.backgroundImageUrl ?? null;
     const [avatarImageError, setAvatarImageError] = useState(false);
-
-    const fetchConversations = useCallback(async () => {
-        try {
-            setIsLoadingConversations(true);
-            const response = await fetch('/api/conversations');
-            if (!response.ok) throw new Error(`Error HTTP ${response.status}`);
-            const data: Conversation[] = await response.json();
-            const forThisCharacter = data.filter(
-                (c) => c.character?.id === character.id
-            );
-            setConversations(forThisCharacter);
-        } catch (err) {
-            console.error('Error al cargar conversaciones:', err);
-        } finally {
-            setIsLoadingConversations(false);
-        }
-    }, [character.id]);
-
-    useEffect(() => {
-        fetchConversations();
-    }, [fetchConversations]);
-
-    useEffect(() => {
-        const onConversationCreated = () => {
-            fetchConversations();
-        };
-
-        window.addEventListener('conversation:created', onConversationCreated);
-        return () => {
-            window.removeEventListener('conversation:created', onConversationCreated);
-        };
-    }, [fetchConversations]);
 
     useEffect(() => {
         setAvatarImageError(false);
     }, [characterImageUrl]);
+
+    if (isEditorialCharacter) {
+        if (editorialError) {
+            return (
+                <div className="flex h-full items-center justify-center px-6 py-10">
+                    <div className="max-w-sm rounded-3xl border border-border bg-card px-5 py-6 text-center shadow-sm">
+                        <p className="text-sm font-semibold text-foreground">No se pudo cargar el panel editorial</p>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                            {editorialError ?? 'El backend no devolvió contenido editorial para este personaje.'}
+                        </p>
+                    </div>
+                </div>
+            )
+        }
+
+        return (
+            <CharacterEditorialPanel
+                character={resolvedCharacter}
+                heroEditorial={heroEditorial}
+                themeColor={themeColor}
+                themeColorLight={themeColorLight}
+                characterImageUrl={characterImageUrl}
+                avatarImageError={avatarImageError}
+                isHeroLoading={isEditorialLoading && !heroData}
+                onAvatarImageError={() => setAvatarImageError(true)}
+            />
+        )
+    }
 
     return (
         <div className="h-full flex flex-col">
@@ -87,15 +124,18 @@ export function CharacterContextPanel({ character, onSelectConversation, selecte
                         style={{ backgroundColor: themeColor }}
                     >
                         {characterImageUrl && !avatarImageError ? (
-                            <img
+                            <Image
                                 src={characterImageUrl}
-                                alt={character.name}
-                                className="w-full h-full object-cover"
+                                alt={resolvedCharacter.name}
+                                fill
+                                unoptimized
+                                sizes="160px"
+                                className="object-cover"
                                 onError={() => setAvatarImageError(true)}
                             />
                         ) : (
                             <span className="text-4xl sm:text-5xl font-serif font-bold text-white">
-                                {character.name[0]}
+                                {resolvedCharacter.name[0]}
                             </span>
                         )}
                     </div>
@@ -104,23 +144,23 @@ export function CharacterContextPanel({ character, onSelectConversation, selecte
                 {/* Character Info */}
                 <div className="relative text-center mt-16 bg-white/80 backdrop-blur-sm rounded-lg p-4">
                     <h1 className="font-serif text-2xl sm:text-3xl font-bold text-foreground mb-1">
-                        {character.name}
+                        {resolvedCharacter.name}
                     </h1>
                     <p className="text-sm text-muted-foreground">
-                        {character.role}
+                        {resolvedCharacter.role}
                     </p>
-                    {(character.years || character.category) && (
+                    {(resolvedCharacter.years || resolvedCharacter.category) && (
                         <div className="flex items-center justify-center gap-2 mt-2 flex-wrap">
-                            {character.category && (
+                            {resolvedCharacter.category && (
                                 <span
                                     className="px-2 py-0.5 rounded-full text-xs font-medium text-white"
                                     style={{ backgroundColor: themeColor }}
                                 >
-                                    {character.category}
+                                    {resolvedCharacter.category}
                                 </span>
                             )}
-                            {character.years && (
-                                <span className="text-xs text-muted-foreground">{character.years}</span>
+                            {resolvedCharacter.years && (
+                                <span className="text-xs text-muted-foreground">{resolvedCharacter.years}</span>
                             )}
                         </div>
                     )}
@@ -131,10 +171,10 @@ export function CharacterContextPanel({ character, onSelectConversation, selecte
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
 
                 {/* Biography */}
-                {character.biography && (
+                {resolvedCharacter.biography && (
                     <section>
                         <p className="text-muted-foreground leading-relaxed">
-                            {character.biography}
+                            {resolvedCharacter.biography}
                         </p>
                     </section>
                 )}
@@ -145,9 +185,9 @@ export function CharacterContextPanel({ character, onSelectConversation, selecte
                         <MessageSquare className="h-4 w-4 text-primary" />
                         De qué quieres hablar?
                     </h3>
-                    {character.topics && character.topics.length > 0 ? (
+                    {resolvedCharacter.topics && resolvedCharacter.topics.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
-                            {character.topics.map((topic) => (
+                            {resolvedCharacter.topics.map((topic) => (
                                 <span
                                     key={topic}
                                     className="px-3 py-1 rounded-full text-sm border border-border bg-muted text-foreground"
@@ -160,66 +200,6 @@ export function CharacterContextPanel({ character, onSelectConversation, selecte
                         <p className="text-sm text-muted-foreground italic">
                             Las sugerencias de temas estarán disponibles próximamente.
                         </p>
-                    )}
-                </section>
-
-                {/* Session History — conversaciones reales */}
-                <section>
-                    <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-primary" />
-                        Historial de conversaciones
-                    </h3>
-
-                    {isLoadingConversations ? (
-                        <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Cargando conversaciones...
-                        </div>
-                    ) : conversations.length === 0 ? (
-                        <p className="text-sm text-muted-foreground italic">
-                            Aún no tienes conversaciones con este personaje.
-                        </p>
-                    ) : (
-                        <div className="space-y-2">
-                            {conversations.map((conv) => (
-                                <button
-                                    key={conv.id}
-                                    onClick={() => onSelectConversation?.({ id: conv.id, mode: conv.mode })}
-                                    className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors cursor-pointer ${
-                                        selectedConversationId === conv.id
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'bg-muted text-foreground hover:bg-muted/80'
-                                    }`}
-                                >
-                                    <MessageSquare className="h-4 w-4 shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate flex items-center gap-2">
-                                            Conversación
-                                            {conv.mode === 'debate' && (
-                                                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                                                    selectedConversationId === conv.id
-                                                        ? 'bg-primary-foreground/20 text-primary-foreground'
-                                                        : 'bg-amber-100 text-amber-700'
-                                                }`}>
-                                                    Debate
-                                                </span>
-                                            )}
-                                        </p>
-                                        <p className={`text-xs ${
-                                            selectedConversationId === conv.id
-                                                ? 'text-primary-foreground/70'
-                                                : 'text-muted-foreground'
-                                        }`}>
-                                            {new Date(conv.createdAt).toLocaleDateString('es-ES', {
-                                                day: 'numeric',
-                                                month: 'short',
-                                                year: 'numeric',
-                                            })}
-                                        </p>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
                     )}
                 </section>
             </div>

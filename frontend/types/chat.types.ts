@@ -19,8 +19,10 @@ export type MessageBlock = TextBlock | ComponentBlock
 
 export interface Message {
   id: number | string
-  role: "user" | "assistant"
+  role: "user" | "assistant" | "system" | "event"
   content: string
+  eventType?: string
+  eventMetaJson?: Record<string, unknown>
   schemaVersion?: MessageSchemaVersion
   blocks?: MessageBlock[]
   metadata?: Record<string, unknown>
@@ -63,30 +65,117 @@ export interface Conversation {
   characterId?: string
   character: Character
   messages: Message[]
-  mode?: "single" | "debate"
+  mode?: "single" | "debate" | "interview"
   secondaryCharacter?: Character | null
 }
 
-export interface DebateResponse {
+export interface SuggestionsPayload {
+  conversationId: string
+  suggestions: string[]
+}
+
+export type DebateTurnOrder = "A" | "B" | "forced"
+
+export type DebateSpeakerSelectionMethod =
+  | "explicit_forced"
+  | "text_mention"
+  | "fallback_next_speaker"
+  | "manual_mode"
+
+export type DebateSkipReason =
+  | "manual"
+  | "manual_user"
+  | "auto_low_confidence"
+  | "not_applicable"
+  | "strategy"
+  | "unknown"
+
+export interface DebateWarningPayload {
+  code: string
+  message: string
+  stage: string
+  retryable: boolean
+}
+
+export interface DebateMessageMetadata extends Record<string, unknown> {
+  debateTraceId?: string
+  turnOrder?: DebateTurnOrder | null
+  warning?: DebateWarningPayload | null
+  isForced?: boolean
+  isSkipped?: boolean
+  skipReason?: DebateSkipReason
+  skipReasonDetail?: string | null
+  skipConfidence?: number | null
+  speakerInferenceMethod?: DebateSpeakerSelectionMethod
+  speakerMentionText?: string
+  speakerMentionConfidence?: number
+}
+
+export interface DebateStartedPayload {
+  conversationId: string
+  traceId: string
+}
+
+export interface DebateUserAckPayload {
+  conversationId: string
+  traceId: string
+  user_message_id: number | string
+  user_text?: string | null
+}
+
+export interface DebateTypingPayload {
+  conversationId: string
+  traceId: string
+  speaker_id: string
+  speaker_name: string
+  turn_order: DebateTurnOrder
+  is_forced?: boolean
+}
+
+export interface DebateTurnPayload {
+  conversationId: string
+  traceId: string
   message_id: number | string
   text: string
   speaker_id: string
   speaker_name: string
+  turn_order: DebateTurnOrder
+  is_forced?: boolean
+  inference_method?: DebateSpeakerSelectionMethod
+  detected_mention_text?: string
+  mention_confidence?: number
   audio?: string | null
-  warning?: {
-    code: string
-    message: string
-    stage: string
-    retryable: boolean
-  } | null
+  warning?: DebateWarningPayload | null
 }
 
-export interface DebateTurnResultPayload {
+export interface DebateTurnSkippedPayload {
   conversationId: string
   traceId: string
-  user_message_id: number | string
-  user_text: string
-  responses: DebateResponse[]
+  message_id?: number
+  speakerId?: string
+  speakerName?: string
+  speaker_id: string
+  speaker_name: string
+  turn_order: DebateTurnOrder
+  turnOrder?: number
+  is_forced?: boolean
+  reason: DebateSkipReason
+  reasonDetail?: string
+  reason_detail?: string
+  confidence?: number
+}
+
+export interface DebateRoundCompletePayload {
+  conversationId: string
+  traceId: string
+  responses_count?: number
+  skips_count?: number
+  next_speaker_id?: string
+  inference_method?: DebateSpeakerSelectionMethod
+  selected_speaker_id?: string
+  detected_mention_text?: string
+  mention_confidence?: number
+  warnings?: DebateWarningPayload[]
 }
 
 export interface DebateErrorPayload {
@@ -95,15 +184,6 @@ export interface DebateErrorPayload {
   code: string
   stage: string
   retryable: boolean
-}
-
-export interface WebSocketMessage {
-  type: "init" | "status" | "transcription_result" | "text_response" | "audio_response" | "error"
-  conversation_id?: string
-  character_id?: string
-  message?: string
-  text?: string
-  audio?: string
 }
 
 export interface AiMessagePayload {
@@ -122,10 +202,31 @@ export interface AiMessagePayload {
   mediaType?: string | null
   media_type?: string | null
   metadata?: Record<string, unknown>
+  suggestions?: string[]
+  suggested_questions?: string[]
 }
 
 export interface StatusDisplayConfig {
   color: string
   icon: string
   bg: string
+}
+
+export interface CharacterKnowledgeBaseUploadResponse {
+  message: string
+  characterId: string
+  collectionName: string
+  fileName: string
+  mimeType: string
+  chunksIndexed: number
+  indexedAt: string
+}
+
+export type UserRole = 'admin' | 'user'
+
+export interface MeProfile {
+  id: string
+  username: string
+  role: UserRole
+  createdAt: string
 }
