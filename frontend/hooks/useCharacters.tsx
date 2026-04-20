@@ -1,12 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import type { Character } from "../types/chat.types"
+import type { Character } from "@/types/chat.types"
 import { normalizeBackendCharacters } from "@/utils/message.utils"
 
 export const useCharacters = (preselectedCharacterId?: string) => {
   const [availableCharacters, setAvailableCharacters] = useState<Character[]>([])
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const fetchCharacters = async () => {
@@ -34,16 +35,18 @@ export const useCharacters = (preselectedCharacterId?: string) => {
         }
       } catch (error) {
         console.error("Error al cargar personajes:", error)
+      } finally {
+        setIsLoading(false)
       }
     }
 
     fetchCharacters()
-  }, [])
+  }, [preselectedCharacterId])
 
   const handleCharacterChange = (newId: string) => {
     setSelectedCharacterId(newId)
     localStorage.setItem("selected_character_id", newId)
   }
 
-  return { availableCharacters, selectedCharacterId, handleCharacterChange }
+  return { availableCharacters, selectedCharacterId, handleCharacterChange, isLoading }
 }

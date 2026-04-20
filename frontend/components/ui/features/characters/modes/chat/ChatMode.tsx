@@ -11,9 +11,19 @@ import { useVoiceRecording } from "@/hooks/useVoiceRecording"
 import { useAudioResolver } from "@/hooks/useAudioResolver"
 import { ChatInput } from "@/components/ui/features/characters/modes/chat/ChatInput"
 import { ChatMessages } from "@/components/ui/features/characters/modes/chat/ChatMessages"
-import { MessageSquare, Phone, Swords, GraduationCap } from "lucide-react"
+import { MessageSquareMore, Phone, Swords, GraduationCap } from "lucide-react"
+import { getErrorMessage } from "@/utils/api.utils"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 
-export type ConversationMode = "chat" | "call" | "interview" | "debate" | "professor"
+export type ConversationMode = "call" | "interview" | "debate" | "professor"
 
 interface ChatInterfaceProps {
   activeMode: ConversationMode
@@ -21,12 +31,13 @@ interface ChatInterfaceProps {
   debateConversationId: string | null
   defaultCharacterId?: string | null
   defaultCharacterName?: string
+  isInitialHistoryLoaded?: boolean
   onModeChange?: (mode: ConversationMode) => void
   onConversationCreated?: (conversation: { id: string; mode?: "single" | "debate" }) => void
 }
 
 const MODES: { id: ConversationMode; label: string; icon: React.ElementType }[] = [
-  { id: "chat", label: "Chat", icon: MessageSquare },
+  { id: "interview", label: "Entrevista", icon: MessageSquareMore },
   { id: "call", label: "Llamada", icon: Phone },
   { id: "debate", label: "Debate", icon: Swords },
   { id: "professor", label: "Profesor", icon: GraduationCap },
@@ -38,11 +49,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   debateConversationId,
   defaultCharacterId = null,
   defaultCharacterName,
+  isInitialHistoryLoaded = false,
   onModeChange,
   onConversationCreated,
 }) => {
   const [status, setStatus] = useState("Desconectado")
-  const chatConversationId = activeMode === "chat" ? singleConversationId : null
+  const [localSingleConversationId, setLocalSingleConversationId] = useState<string | null>(singleConversationId)
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false)
+  const [dynamicSuggestions, setDynamicSuggestions] = useState<string[]>([])
+  const pendingTextQueueRef = useRef<string[]>([])
+  const [isWaitingForResponse, setIsWaitingForResponse] = useState(false)
+
+  useEffect(() => {
+    setLocalSingleConversationId(singleConversationId)
+  }, [singleConversationId])
+
+  const isInterviewMode = activeMode === "interview"
+  const interviewConversationId = isInterviewMode ? localSingleConversationId : null
   const debateConversationIdForPanel = activeMode === "debate" ? debateConversationId : null
 
   const {
@@ -53,7 +76,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     characterName,
     isLoading,
     isModeCompatible,
-  } = useConversation(chatConversationId, { expectedMode: "single" })
+  } = useConversation(interviewConversationId, { expectedMode: "single" })
 
   const effectiveCharacterId = selectedCharacterId ?? defaultCharacterId
   const effectiveCharacterName =
@@ -105,18 +128,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     setStatus("No se detectó voz")
   }, [clearAudioPlaceholder])
 
-  const { sendMessage, sendAudioMessage, isConnected } = useWebSocketChat({
-    conversationId: !isLoading && isModeCompatible ? chatConversationId : null,
+  const { sendMessage, sendAudioMessage, isConnected, isTyping } = useWebSocketChat({
+    conversationId: !isLoading && isModeCompatible ? interviewConversationId : null,
     selectedCharacterId: effectiveCharacterId,
     onStatusChange: setStatus,
     onMessagesUpdate: setMessages,
     onTranscriptionResult,
     onNoSpeech,
+    onSuggestionsReceived: setDynamicSuggestions,
   })
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
-  const { isRecording, audioLevel, startRecording, stopRecording } = useVoiceRecording()
+  const { isRecording, audioLevel, startRecording, stopRecording, errorMessage, clearError } = useVoiceRecording()
 
   const scrollToBottom = useCallback(() => {
     const container = messagesContainerRef.current
@@ -132,11 +156,92 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     scrollToBottom()
   }, [messages, scrollToBottom])
 
-  const handleSendMessage = (text: string) => {
-    if (!text.trim() || !chatConversationId || !isModeCompatible) return
+  useEffect(() => {
+    if (!isWaitingForResponse) return
+    const lastMsg = messages[messages.length - 1]
+    if (lastMsg?.role === 'assistant' && (typeof lastMsg.id === 'string' || (typeof lastMsg.id === 'number' && lastMsg.id > 0))) {
+      setIsWaitingForResponse(false)
+    }
+  }, [messages, isWaitingForResponse])
+
+  useEffect(() => {
+    setDynamicSuggestions([])
+  }, [interviewConversationId])
+
+  const createSingleConversation = useCallback(async (): Promise<string | null> => {
+    if (!effectiveCharacterId || isCreatingConversation) return null
+
+    try {
+      setIsCreatingConversation(true)
+      setStatus("Iniciando conversación...")
+
+      const response = await fetch("/api/conversations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ characterId: effectiveCharacterId }),
+      })
+
+      if (!response.ok) {
+        const message = await getErrorMessage(response)
+        throw new Error(message)
+      }
+
+      const payload: { id?: string } = await response.json()
+      if (!payload.id) {
+        throw new Error("No se recibió el id de la conversación")
+      }
+
+      setLocalSingleConversationId(payload.id)
+      onConversationCreated?.({ id: payload.id, mode: "single" })
+      window.dispatchEvent(
+        new CustomEvent("conversation:created", {
+          detail: { id: payload.id, mode: "single" },
+        }),
+      )
+
+      return payload.id
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error al iniciar conversación"
+      setStatus(`Error: ${message}`)
+      return null
+    } finally {
+      setIsCreatingConversation(false)
+    }
+  }, [effectiveCharacterId, isCreatingConversation, onConversationCreated])
+
+  const handleSendMessage = async (text: string) => {
+    if (!isInitialHistoryLoaded || !text.trim() || !effectiveCharacterId) return
+
+    let currentConversationId = interviewConversationId
+
+    if (!currentConversationId) {
+      currentConversationId = await createSingleConversation()
+      if (!currentConversationId) return
+    }
+
     setMessages((prev) => [...prev, { id: -Date.now(), role: "user", content: text }])
-    sendMessage(text)
+    setIsWaitingForResponse(true)
+
+    if (isConnected && isModeCompatible) {
+      sendMessage(text)
+      return
+    }
+
+    pendingTextQueueRef.current.push(text)
+    setStatus("Conectando para enviar mensaje...")
   }
+
+  useEffect(() => {
+    if (!interviewConversationId || !isModeCompatible || !isConnected) return
+    if (pendingTextQueueRef.current.length === 0) return
+
+    const queuedMessages = [...pendingTextQueueRef.current]
+    pendingTextQueueRef.current = []
+
+    queuedMessages.forEach((queuedText) => sendMessage(queuedText))
+  }, [interviewConversationId, isModeCompatible, isConnected, sendMessage])
 
   const handleToggleRecording = async () => {
     try {
@@ -151,11 +256,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             ...prev,
             { id: placeholderId, role: "user", content: "🎤 Enviando audio..." },
           ])
+          setIsWaitingForResponse(true)
           sendAudioMessage(base64Data)
         }
         setShowVoiceModal(false)
       } else {
-        await startRecording()
+        const didStartRecording = await startRecording()
+        if (!didStartRecording) {
+          setShowVoiceModal(false)
+          return
+        }
+
         setStatus("Grabando voz...")
         setShowVoiceModal(true)
       }
@@ -182,8 +293,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     onModeChange?.(mode)
   }
 
-  const resolveAudioUrl = useAudioResolver(chatConversationId, messages, setMessages)
-  const showChatConversation = Boolean(chatConversationId && isModeCompatible)
+  const resolveAudioUrl = useAudioResolver(interviewConversationId, messages, setMessages)
+  const showInterviewConversation = Boolean(interviewConversationId && isModeCompatible)
+  const hasOptimisticMessages = messages.some(m => typeof m.id === 'number' && m.id < 0)
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] overflow-hidden border border-border rounded-xl">
@@ -206,39 +318,42 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       {/* Content area */}
-      {activeMode === "chat" ? (
+      {isInterviewMode ? (
         <>
           {/* Messages */}
           <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-            {chatConversationId && isLoading ? (
+            {interviewConversationId && isLoading && !hasOptimisticMessages ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-8">
                 <h3 className="text-base font-semibold mb-1 text-foreground">Cargando conversación</h3>
                 <p className="text-sm text-muted-foreground max-w-xs">
                   Verificando el historial y el tipo de conversación seleccionado.
                 </p>
               </div>
-            ) : showChatConversation ? (
+            ) : (showInterviewConversation || hasOptimisticMessages) ? (
               <ChatMessages
                 messages={messages}
                 availableCharacters={effectiveAvailableCharacters}
                 selectedCharacterId={effectiveCharacterId}
-                conversationId={chatConversationId}
+                conversationId={interviewConversationId}
                 messagesEndRef={messagesEndRef}
                 resolveAudioUrl={resolveAudioUrl}
                 characterName={effectiveCharacterName}
+                isTyping={isTyping || isWaitingForResponse}
               />
-            ) : chatConversationId && !isLoading ? (
+            ) : interviewConversationId && !isLoading ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-8">
-                <h3 className="text-base font-semibold mb-1 text-foreground">Esta conversación no pertenece al chat individual</h3>
+                <h3 className="text-base font-semibold mb-1 text-foreground">Esta conversación no pertenece al modo entrevista</h3>
                 <p className="text-sm text-muted-foreground max-w-xs">
-                  Cambia a la pestaña Debate para retomarla o selecciona una conversación de chat desde el historial.
+                  Cambia a la pestaña Debate para retomarla o selecciona una conversación desde el historial.
                 </p>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center py-8">
                 <h3 className="text-base font-semibold mb-1 text-foreground">No hay conversación activa</h3>
                 <p className="text-sm text-muted-foreground max-w-xs">
-                  Selecciona una conversación del historial o cambia a otra pestaña para continuar.
+                  {isInitialHistoryLoaded
+                    ? "Escribe tu primer mensaje para crear una conversación automáticamente o selecciona una del historial."
+                    : "Cargando historial de conversaciones... cuando termine, podrás enviar tu primer mensaje."}
                 </p>
               </div>
             )}
@@ -248,10 +363,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           <div className="border-t border-border p-4 shrink-0">
             <ChatInput
               isRecording={isRecording}
-              isConnected={Boolean(showChatConversation && isConnected)}
+              isConnected={Boolean(showInterviewConversation && isConnected)}
               isModalOpen={showVoiceModal}
               selectedCharacterId={effectiveCharacterId}
+              canSendMessages={Boolean(effectiveCharacterId && !isCreatingConversation && isInitialHistoryLoaded)}
               availableCharacters={effectiveAvailableCharacters}
+              suggestions={dynamicSuggestions}
               onSendMessage={handleSendMessage}
               onToggleRecording={handleToggleRecording}
               status={status}
@@ -259,7 +376,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </div>
         </>
       ) : activeMode === "call" ? (
-        <CallModePanel characterId={effectiveCharacterId} onEndCall={() => onModeChange?.("chat")} />
+        <CallModePanel characterId={effectiveCharacterId} onEndCall={() => onModeChange?.("interview")} />
       ) : activeMode === "debate" ? (
         <DebatePanel
           currentCharacterId={effectiveCharacterId}
@@ -275,12 +392,24 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       )}
 
       <VoiceRecordingModal
-        isOpen={showVoiceModal}
+        isOpen={showVoiceModal && !errorMessage}
         onToggleRecording={handleToggleRecording}
         isRecording={isRecording}
         audioLevel={audioLevel}
         onClose={handleCloseVoiceModal}
       />
+
+      <Dialog open={!!errorMessage} onOpenChange={(open) => { if (!open) clearError() }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Error de audio</DialogTitle>
+            <DialogDescription>{errorMessage}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={clearError}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -2,13 +2,15 @@
 
 import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
-import { ArrowLeft, Send, Swords } from "lucide-react"
+import { ArrowLeft, Mic, MicOff, Send, Swords } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StatusIndicator } from "@/components/ui/features/characters/shared/StatusIndicator"
 import { DebateChatMessages } from "@/components/ui/features/characters/modes/debate/DebateChatMessages"
+import { VoiceRecordingModal } from "@/components/ui/features/characters/shared/VoiceRecordingModal"
 import { useDebateWebSocket } from "@/hooks/useDebateWebSocket"
-import type { Character } from "@/types/chat.types"
+import { useVoiceRecording } from "@/hooks/useVoiceRecording"
+import type { Character, Message } from "@/types/chat.types"
 import { normalizeBackendMessages } from "@/utils/message.utils"
 import { colorFromName } from "@/utils/character.utils"
 
@@ -33,30 +35,83 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
 }) => {
   const [status, setStatus] = useState("Conectando...")
   const [inputValue, setInputValue] = useState("")
+  const [forcedSpeakerId, setForcedSpeakerId] = useState<string | null>(null)
+  const [showVoiceModal, setShowVoiceModal] = useState(false)
+  const [isSendingAudio, setIsSendingAudio] = useState(false)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const { messages, setMessages, sendDebateMessage, isConnected, isSending, errorMessage } =
-    useDebateWebSocket({ conversationId, onStatusChange: setStatus })
+  const loadHistory = useCallback(async (): Promise<Message[] | null> => {
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}`)
+      if (!response.ok) return null
+
+      const data = await response.json()
+      return normalizeBackendMessages(data.messages ?? [])
+    } catch {
+      return null
+    }
+  }, [conversationId])
+
+  const {
+    messages,
+    setMessages,
+    sendDebateMessage,
+    sendDebateAudio,
+    skipDebateTurn,
+    retryLastMessage,
+    isConnected,
+    isSending,
+    errorState,
+    typingCharacterId,
+    suggestions,
+    canRetry,
+    hasSkipInActiveRound,
+    skipLockedBySpeakerId,
+  } = useDebateWebSocket({
+    conversationId,
+    onStatusChange: setStatus,
+    fetchConversationMessages: loadHistory,
+  })
+
+  const { isRecording, audioLevel, startRecording, stopRecording, errorMessage, clearError } =
+    useVoiceRecording()
 
   // Load history whenever conversation changes.
   useEffect(() => {
+    let isMounted = true
     setMessages([])
 
-    const loadHistory = async () => {
-      try {
-        const response = await fetch(`/api/conversations/${conversationId}`)
-        if (!response.ok) return
-        const data = await response.json()
-        const historical = normalizeBackendMessages(data.messages ?? [])
+    const syncHistory = async () => {
+      const historical = await loadHistory()
+      if (historical && isMounted) {
         setMessages(historical)
-      } catch {
-        // non-critical; debate continues without history
       }
     }
 
-    loadHistory()
-  }, [conversationId, setMessages])
+    void syncHistory()
+
+    return () => {
+      isMounted = false
+    }
+  }, [conversationId, loadHistory, setMessages])
+
+  useEffect(() => {
+    setForcedSpeakerId(null)
+  }, [conversationId])
+
+  useEffect(() => {
+    if (!isSending) {
+      setIsSendingAudio(false)
+    }
+  }, [isSending])
+
+  useEffect(() => {
+    if (!errorMessage) return
+
+    setStatus(errorMessage)
+    setShowVoiceModal(false)
+  }, [errorMessage])
 
   // Auto-scroll on new messages
   const scrollToBottom = useCallback(() => {
@@ -71,9 +126,95 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
 
   const handleSend = () => {
     if (!inputValue.trim() || !isConnected || isSending) return
-    sendDebateMessage(inputValue.trim())
+    sendDebateMessage(inputValue.trim(), forcedSpeakerId)
     setInputValue("")
+    setForcedSpeakerId(null)
   }
+
+  const handleSuggestionClick = (suggestion: string) => {
+    if (!isConnected || isSending) return
+    sendDebateMessage(suggestion, forcedSpeakerId)
+    setForcedSpeakerId(null)
+  }
+
+  const handleRetry = () => {
+    void retryLastMessage()
+  }
+
+  const handleSkip = (speakerId: string) => {
+    skipDebateTurn(speakerId, "manual_user")
+  }
+
+  const handleToggleRecording = async () => {
+    if (!isConnected || isSending || isSendingAudio) return
+
+    try {
+      if (isRecording) {
+        setStatus("Procesando audio...")
+        setIsSendingAudio(true)
+
+        const base64Data = await stopRecording()
+        setShowVoiceModal(false)
+
+        if (!base64Data) {
+          setIsSendingAudio(false)
+          setStatus("No se pudo capturar audio")
+          return
+        }
+
+        const didSend = sendDebateAudio(base64Data, "audio/webm", forcedSpeakerId)
+
+        if (didSend) {
+          setForcedSpeakerId(null)
+          setStatus("Enviando audio...")
+          return
+        }
+
+        setIsSendingAudio(false)
+        setStatus("No se pudo enviar el audio")
+        return
+      }
+
+      clearError()
+      const didStartRecording = await startRecording()
+      if (!didStartRecording) {
+        setShowVoiceModal(false)
+        return
+      }
+
+      setStatus("Grabando voz...")
+      setShowVoiceModal(true)
+    } catch (error) {
+      console.error("Error al grabar audio en debate:", error)
+      setIsSendingAudio(false)
+      setShowVoiceModal(false)
+      setStatus("Error en grabación")
+    }
+  }
+
+  const handleCloseVoiceModal = async () => {
+    if (isRecording) {
+      try {
+        await stopRecording()
+      } catch (error) {
+        console.error("Error al cancelar grabación de debate:", error)
+      }
+    }
+
+    clearError()
+    setShowVoiceModal(false)
+    setIsSendingAudio(false)
+    setStatus("Listo")
+  }
+
+  const controlsDisabled = !isConnected || isSending || isSendingAudio || showVoiceModal
+  const skipControlsDisabled = controlsDisabled || hasSkipInActiveRound
+  const skippedSpeakerName =
+    skipLockedBySpeakerId === characterA.id
+      ? getShortName(characterA)
+      : skipLockedBySpeakerId === characterB.id
+        ? getShortName(characterB)
+        : null
 
   const colorA = getThemeColor(characterA)
   const colorB = getThemeColor(characterB)
@@ -137,41 +278,184 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
           </p>
         )}
         <DebateChatMessages
+          conversationId={conversationId}
           messages={messages}
           characterA={characterA}
           characterB={characterB}
+          typingCharacterId={typingCharacterId}
           messagesEndRef={messagesEndRef}
         />
       </div>
 
       {/* Error */}
-      {errorMessage && (
-        <div className="px-4 py-2 bg-destructive/10 border-t border-destructive/20 shrink-0">
-          <p className="text-sm text-destructive text-center">{errorMessage}</p>
+      {errorState && (
+        <div className="px-4 py-3 bg-destructive/10 border-t border-destructive/20 shrink-0">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-destructive">{errorState.message}</p>
+              <p className="text-xs text-destructive/80 mt-1">
+                Código: {errorState.code} · Etapa: {errorState.stage}
+              </p>
+            </div>
+            {canRetry && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleRetry}
+                disabled={!isConnected || isSending}
+                className="border-destructive/30 bg-background text-destructive hover:bg-destructive/5"
+              >
+                Reintentar ronda
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
       {/* Input */}
       <div className="border-t border-border p-4 shrink-0">
+        <div className="mb-3 rounded-xl border border-border/70 bg-muted/30 p-3 space-y-3">
+          <p className="text-xs font-medium text-foreground/80">Control de turnos (próxima ronda)</p>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <Button
+              type="button"
+              variant={forcedSpeakerId === null ? "default" : "outline"}
+              size="sm"
+              disabled={controlsDisabled}
+              onClick={() => setForcedSpeakerId(null)}
+            >
+              Alternar automático
+            </Button>
+            <Button
+              type="button"
+              variant={forcedSpeakerId === characterA.id ? "default" : "outline"}
+              size="sm"
+              disabled={controlsDisabled}
+              onClick={() => setForcedSpeakerId(characterA.id)}
+            >
+              {getShortName(characterA)} luego {getShortName(characterB)}
+            </Button>
+            <Button
+              type="button"
+              variant={forcedSpeakerId === characterB.id ? "default" : "outline"}
+              size="sm"
+              disabled={controlsDisabled}
+              onClick={() => setForcedSpeakerId(characterB.id)}
+            >
+              {getShortName(characterB)} luego {getShortName(characterA)}
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={controlsDisabled}
+              onClick={() => setForcedSpeakerId(characterA.id)}
+            >
+              Dar la palabra a {getShortName(characterA)}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={controlsDisabled}
+              onClick={() => setForcedSpeakerId(characterB.id)}
+            >
+              Dar la palabra a {getShortName(characterB)}
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={skipControlsDisabled}
+              onClick={() => handleSkip(characterA.id)}
+            >
+              <MicOff className="h-4 w-4 mr-1" />
+              {getShortName(characterA)} pasa turno
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={skipControlsDisabled}
+              onClick={() => handleSkip(characterB.id)}
+            >
+              <MicOff className="h-4 w-4 mr-1" />
+              {getShortName(characterB)} pasa turno
+            </Button>
+          </div>
+
+          {hasSkipInActiveRound && (
+            <p className="text-xs text-muted-foreground">
+              {skippedSpeakerName
+                ? `${skippedSpeakerName} ya pasó su turno en esta ronda. Envía una intervención para continuar.`
+                : "Ya se pasó un turno en esta ronda. Envía una intervención para continuar."}
+            </p>
+          )}
+        </div>
+
         <p className="text-xs text-muted-foreground mb-2 text-center">Moderado por: Tú</p>
+          {suggestions.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-1 mb-2">
+              {suggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  disabled={controlsDisabled}
+                  className="px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          )}
         <div className="flex gap-2">
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="Escribe una pregunta al debate..."
-            disabled={!isConnected || isSending}
+            disabled={controlsDisabled}
             className="flex-1"
           />
           <Button
+            type="button"
+            size="icon"
+            variant={isRecording ? "destructive" : "outline"}
+            onClick={() => void handleToggleRecording()}
+            disabled={!isConnected || isSending || isSendingAudio || showVoiceModal}
+            aria-label={isRecording ? "Detener grabación" : "Grabar audio para el debate"}
+          >
+            <Mic className="h-4 w-4" />
+          </Button>
+          <Button
             size="icon"
             onClick={handleSend}
-            disabled={!isConnected || isSending || !inputValue.trim()}
+            disabled={controlsDisabled || !inputValue.trim()}
           >
             <Send className="h-4 w-4" />
           </Button>
         </div>
+        {errorMessage && (
+          <p className="mt-2 text-xs text-destructive">{errorMessage}</p>
+        )}
       </div>
+
+      <VoiceRecordingModal
+        isOpen={showVoiceModal && !errorMessage}
+        isRecording={isRecording}
+        audioLevel={audioLevel}
+        onClose={() => void handleCloseVoiceModal()}
+        onToggleRecording={() => void handleToggleRecording()}
+      />
     </div>
   )
 }

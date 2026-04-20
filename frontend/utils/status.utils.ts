@@ -16,11 +16,33 @@ export const getStatusDisplay = (status: string): StatusDisplayConfig => {
         icon: "●",
         bg: "bg-red-100 dark:bg-red-900/30",
       }
+    case "No autenticado":
+      return {
+        color: "text-red-600 dark:text-red-400",
+        icon: "!",
+        bg: "bg-red-100 dark:bg-red-900/30",
+      }
+    case "Error":
+      return {
+        color: "text-red-600 dark:text-red-400",
+        icon: "!",
+        bg: "bg-red-100 dark:bg-red-900/30",
+      }
     case "Grabando voz...":
       return {
         color: "text-orange-600 dark:text-orange-400",
         icon: "●",
         bg: "bg-orange-100 dark:bg-orange-900/30",
+      }
+    case "Reautenticando...":
+    case "Esperando confirmación...":
+    case "Esperando respuestas...":
+    case "Esperando siguiente respuesta...":
+    case "Cerrando ronda...":
+      return {
+        color: "text-amber-600 dark:text-amber-400",
+        icon: "●",
+        bg: "bg-amber-100 dark:bg-amber-900/30",
       }
     default:
       return {
