@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { useCharacterById } from "@/hooks/useCharacterById"
 import { useBackendLive } from "@/hooks/useBackendLive"
 import { StreamingText } from "@/components/ui/features/characters/shared/StreamingText"
+import { CallModeSkeleton } from "@/components/ui/features/skeletons/CallModeSkeleton"
 import { ConnectionStatus } from "@/types/live.types"
 import { useAnimatedEntryKeys } from "@/hooks/useAnimatedEntryKeys"
 
@@ -131,11 +132,7 @@ export function CallModePanel({ characterId, onEndCall }: CallModePanelProps) {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center p-6 bg-muted/20">
-        <p className="text-sm text-muted-foreground">Cargando informacion del personaje...</p>
-      </div>
-    )
+    return <CallModeSkeleton />
   }
 
   if (error || !character) {

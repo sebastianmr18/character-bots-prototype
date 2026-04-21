@@ -1,9 +1,10 @@
 'use client'
 
 import { type ReactNode } from 'react'
-import { Clock, Loader2, MessageSquare } from 'lucide-react'
+import { Clock, MessageSquare } from 'lucide-react'
 import type { Character, Conversation } from '@/types/chat.types'
 import { cn } from '@/lib/utils'
+import { ConversationItemSkeleton } from '@/components/ui/features/skeletons/ConversationItemSkeleton'
 
 interface CharacterConversationHistoryProps {
   character: Character
@@ -43,9 +44,10 @@ export function CharacterConversationHistory({
 
       <div className="flex-1 overflow-y-auto p-3">
         {isLoadingConversations ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Cargando conversaciones...
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <ConversationItemSkeleton key={index} />
+            ))}
           </div>
         ) : conversations.length === 0 ? (
           <p className="text-sm italic text-muted-foreground">
