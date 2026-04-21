@@ -1,79 +1,29 @@
 'use client'
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import { Clock, Loader2, MessageSquare } from 'lucide-react'
 import type { Character, Conversation } from '@/types/chat.types'
 import { cn } from '@/lib/utils'
 
 interface CharacterConversationHistoryProps {
   character: Character
+  conversations: Conversation[]
+  isLoadingConversations: boolean
   onSelectConversation?: (conversation: { id: string; mode?: Conversation['mode'] }) => void
-  selectedConversationId?: string
-  onInitialHistoryLoaded?: () => void
+  selectedConversationId?: string | null
   className?: string
   headerAction?: ReactNode
 }
 
 export function CharacterConversationHistory({
   character,
+  conversations,
+  isLoadingConversations,
   onSelectConversation,
   selectedConversationId,
-  onInitialHistoryLoaded,
   className,
   headerAction,
 }: CharacterConversationHistoryProps) {
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [isLoadingConversations, setIsLoadingConversations] = useState(true)
-  const [hasLoadedInitialHistory, setHasLoadedInitialHistory] = useState(false)
-  const [hasNotifiedInitialHistoryLoaded, setHasNotifiedInitialHistoryLoaded] = useState(false)
-
-  const fetchConversations = useCallback(async () => {
-    try {
-      setIsLoadingConversations(true)
-      const response = await fetch('/api/conversations')
-      if (!response.ok) throw new Error(`Error HTTP ${response.status}`)
-
-      const data: Conversation[] = await response.json()
-      const forThisCharacter = data.filter((conversation) => conversation.character?.id === character.id || conversation.secondaryCharacter?.id === character.id)
-      setConversations(forThisCharacter)
-      setHasLoadedInitialHistory(true)
-    } catch (error) {
-      console.error('Error al cargar conversaciones:', error)
-    } finally {
-      setIsLoadingConversations(false)
-    }
-  }, [character.id])
-
-  useEffect(() => {
-    setHasLoadedInitialHistory(false)
-    setHasNotifiedInitialHistoryLoaded(false)
-  }, [character.id])
-
-  useEffect(() => {
-    if (!hasLoadedInitialHistory || hasNotifiedInitialHistoryLoaded) {
-      return
-    }
-
-    onInitialHistoryLoaded?.()
-    setHasNotifiedInitialHistoryLoaded(true)
-  }, [hasLoadedInitialHistory, hasNotifiedInitialHistoryLoaded, onInitialHistoryLoaded])
-
-  useEffect(() => {
-    fetchConversations()
-  }, [fetchConversations])
-
-  useEffect(() => {
-    const onConversationCreated = () => {
-      fetchConversations()
-    }
-
-    window.addEventListener('conversation:created', onConversationCreated)
-
-    return () => {
-      window.removeEventListener('conversation:created', onConversationCreated)
-    }
-  }, [fetchConversations])
-
   return (
     <aside className={cn('flex h-full flex-col border-l border-border bg-muted/20', className)}>
       <div className="border-b border-border px-4 py-4">
