@@ -45,6 +45,7 @@ export interface CharacterReference {
 export interface Character {
   id: string
   name: string
+  publicSlug?: string | null
   description: string
   role: string
   biography: string

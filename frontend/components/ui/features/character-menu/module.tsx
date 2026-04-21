@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import type { Character } from '@/types/chat.types'
 import { MessageSquare } from 'lucide-react'
+import { normalizeBackendCharacters } from '@/utils/message.utils'
 import { toSlug, colorFromName, lightColorFromName } from '@/utils/character.utils'
 
 export default function ChatsConversationsPage() {
@@ -21,7 +22,7 @@ export default function ChatsConversationsPage() {
       if (!charResponse.ok) throw new Error(`Error HTTP Personajes ${charResponse.status}`)
 
       const charactersData: Character[] = await charResponse.json()
-      setCharacters(charactersData)
+      setCharacters(normalizeBackendCharacters(charactersData))
 
     } catch (error) {
       console.error('Error al cargar datos:', error)
@@ -34,8 +35,9 @@ export default function ChatsConversationsPage() {
     fetchAllData()
   }, [fetchAllData])
 
-  const handleCharacterClick = useCallback((characterName: string) => {
-    router.push(`/personajes/${toSlug(characterName)}`)
+  const handleCharacterClick = useCallback((character: Character) => {
+    const slug = character.publicSlug ?? toSlug(character.name)
+    router.push(`/personajes/${slug}`)
   }, [router])
 
   if (loading) {
@@ -71,7 +73,7 @@ export default function ChatsConversationsPage() {
               <div
                 key={character.id}
                 className="group relative rounded-lg overflow-hidden bg-card border border-border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
-                onClick={() => handleCharacterClick(character.name)}
+                onClick={() => handleCharacterClick(character)}
                 style={{
                   '--character-color': character.themeColor ?? colorFromName(character.name),
                   '--character-color-light': character.themeColorLight ?? lightColorFromName(character.name),

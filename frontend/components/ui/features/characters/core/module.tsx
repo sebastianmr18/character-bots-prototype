@@ -5,9 +5,8 @@ import { useRouter } from 'next/navigation'
 import { MessageSquare, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import CharacterProfile from '@/components/ui/features/characters/core/CharacterProfile'
-import { findCharacterBySlug } from '@/utils/character.utils'
 import type { Character } from '@/types/chat.types'
-import { normalizeBackendCharacters } from '@/utils/message.utils'
+import { normalizeBackendCharacter } from '@/utils/message.utils'
 
 interface CharacterProfilePageProps {
   slug: string
@@ -20,30 +19,26 @@ export default function CharacterProfilePage({ slug }: CharacterProfilePageProps
   const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
-    const fetchAndFind = async () => {
+    const fetchCharacter = async () => {
       try {
         setIsLoading(true)
-        const response = await fetch('/api/characters')
+        setNotFound(false)
+
+        const response = await fetch(`/api/characters/by-slug/${encodeURIComponent(slug)}`)
         if (!response.ok) throw new Error(`Error HTTP ${response.status}`)
 
-        const data: Character[] = await response.json()
-        const normalized = normalizeBackendCharacters(data)
-        const found = findCharacterBySlug(normalized, slug)
-
-        if (found) {
-          setCharacter(found)
-        } else {
-          setNotFound(true)
-        }
+        const data: Character = await response.json()
+        setCharacter(normalizeBackendCharacter(data))
       } catch (err) {
-        console.error('Error al cargar personajes:', err)
+        console.error('Error al cargar personaje:', err)
+        setCharacter(null)
         setNotFound(true)
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchAndFind()
+    fetchCharacter()
   }, [slug])
 
   if (isLoading) {
@@ -64,7 +59,7 @@ export default function CharacterProfilePage({ slug }: CharacterProfilePageProps
           <MessageSquare className="w-16 h-16 text-muted-foreground/30" />
           <h1 className="text-2xl font-serif font-bold">Personaje no encontrado</h1>
           <p className="text-muted-foreground">
-            No encontramos un personaje con ese nombre.
+            No encontramos un personaje con ese enlace.
           </p>
           <Button onClick={() => router.push('/personajes')}>
             Ver todos los personajes
