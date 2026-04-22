@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import type { Character } from '@/types/chat.types'
 import { MessageSquare } from 'lucide-react'
+import { normalizeBackendCharacters } from '@/utils/message.utils'
 import { toSlug, colorFromName, lightColorFromName } from '@/utils/character.utils'
+import { CharacterCardSkeleton } from '@/components/ui/features/skeletons/CharacterCardSkeleton'
 
 export default function ChatsConversationsPage() {
   const router = useRouter()
@@ -21,7 +23,7 @@ export default function ChatsConversationsPage() {
       if (!charResponse.ok) throw new Error(`Error HTTP Personajes ${charResponse.status}`)
 
       const charactersData: Character[] = await charResponse.json()
-      setCharacters(charactersData)
+      setCharacters(normalizeBackendCharacters(charactersData))
 
     } catch (error) {
       console.error('Error al cargar datos:', error)
@@ -34,14 +36,34 @@ export default function ChatsConversationsPage() {
     fetchAllData()
   }, [fetchAllData])
 
-  const handleCharacterClick = useCallback((characterName: string) => {
-    router.push(`/personajes/${toSlug(characterName)}`)
+  const handleCharacterClick = useCallback((character: Character) => {
+    const slug = character.publicSlug ?? toSlug(character.name)
+    router.push(`/personajes/${slug}`)
   }, [router])
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-gray-600 dark:text-gray-400 animate-pulse text-xl">Cargando personajes...</p>
+      <main className="min-h-screen bg-background">
+        <div className="pt-24 pb-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12">
+              <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-4">
+                Elige con quien conversar hoy
+              </h1>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Explora nuestra coleccion de personajes historicos y ficticios
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 py-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <CharacterCardSkeleton key={index} />
+            ))}
+          </div>
+        </div>
       </main>
     )
   }
@@ -71,7 +93,7 @@ export default function ChatsConversationsPage() {
               <div
                 key={character.id}
                 className="group relative rounded-lg overflow-hidden bg-card border border-border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
-                onClick={() => handleCharacterClick(character.name)}
+                onClick={() => handleCharacterClick(character)}
                 style={{
                   '--character-color': character.themeColor ?? colorFromName(character.name),
                   '--character-color-light': character.themeColorLight ?? lightColorFromName(character.name),

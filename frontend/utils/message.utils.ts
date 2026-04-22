@@ -59,6 +59,8 @@ type BackendMessage = {
 }
 
 type BackendCharacter = Omit<Character, "voiceId" | "vectorDbName" | "imageUrl" | "backgroundImageUrl"> & {
+  publicSlug?: string | null
+  public_slug?: string | null
   voiceId?: string | null
   voice_id?: string | null
   vectorDbName?: string | null
@@ -188,6 +190,7 @@ export const normalizeBackendMessages = (messages: BackendMessage[] = []): Messa
 
 export const normalizeBackendCharacter = (character: BackendCharacter): Character => ({
   ...character,
+  publicSlug: character.publicSlug ?? character.public_slug ?? null,
   voiceId: character.voiceId ?? character.voice_id ?? null,
   vectorDbName: character.vectorDbName ?? character.vector_db_name ?? null,
   themeColor: character.themeColor ?? character.theme_color ?? null,

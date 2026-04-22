@@ -11,6 +11,7 @@ import { useVoiceRecording } from "@/hooks/useVoiceRecording"
 import { useAudioResolver } from "@/hooks/useAudioResolver"
 import { ChatInput } from "@/components/ui/features/characters/modes/chat/ChatInput"
 import { ChatMessages } from "@/components/ui/features/characters/modes/chat/ChatMessages"
+import { ChatMessagesLoadingSkeleton } from "@/components/ui/features/skeletons/ChatMessageSkeleton"
 import { MessageSquareMore, Phone, Swords, GraduationCap } from "lucide-react"
 import { getErrorMessage } from "@/utils/api.utils"
 import {
@@ -323,12 +324,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           {/* Messages */}
           <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
             {interviewConversationId && isLoading && !hasOptimisticMessages ? (
-              <div className="flex flex-col items-center justify-center h-full text-center py-8">
-                <h3 className="text-base font-semibold mb-1 text-foreground">Cargando conversación</h3>
-                <p className="text-sm text-muted-foreground max-w-xs">
-                  Verificando el historial y el tipo de conversación seleccionado.
-                </p>
-              </div>
+              <ChatMessagesLoadingSkeleton />
             ) : (showInterviewConversation || hasOptimisticMessages) ? (
               <ChatMessages
                 messages={messages}

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { hasAdminRole } from '@/lib/api/admin-authorization'
 
 type RouteContext = {
   params: Promise<{ characterId: string }>
@@ -11,25 +12,6 @@ const tryParseJson = (text: string): unknown => {
   } catch {
     return null
   }
-}
-
-const hasAdminRole = async (token: string): Promise<boolean> => {
-  if (!process.env.BACKEND_URL) return false
-
-  const meResponse = await fetch(`${process.env.BACKEND_URL}/me`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    cache: 'no-store',
-  })
-
-  if (!meResponse.ok) {
-    return false
-  }
-
-  const meData = (await meResponse.json()) as { role?: string }
-  return meData.role === 'admin'
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
