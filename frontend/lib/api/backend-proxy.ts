@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { hasAdminRole } from '@/lib/api/admin-authorization'
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
@@ -7,6 +8,7 @@ interface ProxyOptions {
   method: HttpMethod
   backendPath: string
   requestBody?: string
+  requireAdmin?: boolean
 }
 
 const tryParseJson = (text: string): unknown => {
@@ -26,6 +28,7 @@ export async function proxyToBackend({
   method,
   backendPath,
   requestBody,
+  requireAdmin = false,
 }: ProxyOptions): Promise<NextResponse> {
   try {
     const supabase = await createClient()
@@ -43,6 +46,17 @@ export async function proxyToBackend({
         { error: 'BACKEND_URL is not configured' },
         { status: 500 },
       )
+    }
+
+    if (requireAdmin) {
+      const isAdmin = await hasAdminRole(session.access_token)
+
+      if (!isAdmin) {
+        return NextResponse.json(
+          { error: 'Forbidden: admin role required.' },
+          { status: 403 },
+        )
+      }
     }
 
     const headers: Record<string, string> = {

@@ -29,6 +29,8 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
   const [lastDebateConversation, setLastDebateConversation] = useState<SelectedConversation | null>(null)
   const [isInitialHistoryLoaded, setIsInitialHistoryLoaded] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(true)
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [isLoadingConversations, setIsLoadingConversations] = useState(true)
 
   const handleSelectConversation = useCallback((conversation: SelectedConversation) => {
     if (getConversationMode(conversation) === 'debate') {
@@ -56,14 +58,55 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
     setActiveMode(mode)
   }, [])
 
-  const handleInitialHistoryLoaded = useCallback(() => {
-    setIsInitialHistoryLoaded(true)
-  }, [])
+  const fetchConversations = useCallback(async () => {
+    try {
+      setIsLoadingConversations(true)
+
+      const query = new URLSearchParams({ characterId: character.id })
+      const response = await fetch(`/api/conversations?${query.toString()}`)
+      if (!response.ok) {
+        throw new Error(`Error HTTP ${response.status}`)
+      }
+
+      const data: Conversation[] = await response.json()
+      const forThisCharacter = data.filter(
+        (conversation) =>
+          conversation.character?.id === character.id ||
+          conversation.secondaryCharacter?.id === character.id,
+      )
+
+      setConversations(forThisCharacter)
+      setIsInitialHistoryLoaded(true)
+    } catch (error) {
+      console.error('Error al cargar conversaciones:', error)
+      setConversations([])
+    } finally {
+      setIsLoadingConversations(false)
+    }
+  }, [character.id])
 
   useEffect(() => {
     setIsInitialHistoryLoaded(false)
     setIsHistoryOpen(true)
+    setConversations([])
+    setIsLoadingConversations(true)
   }, [character.id])
+
+  useEffect(() => {
+    void fetchConversations()
+  }, [fetchConversations])
+
+  useEffect(() => {
+    const onConversationCreated = () => {
+      void fetchConversations()
+    }
+
+    window.addEventListener('conversation:created', onConversationCreated)
+
+    return () => {
+      window.removeEventListener('conversation:created', onConversationCreated)
+    }
+  }, [fetchConversations])
 
   const selectedConversationId = activeMode === 'debate'
     ? lastDebateConversation?.id
@@ -88,6 +131,12 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
     </Button>
   )
 
+  const desktopHistoryToggleButton = (
+    <div className="hidden lg:block">
+      {historyToggleButton}
+    </div>
+  )
+
   return (
     <main className="min-h-screen bg-background flex flex-col">
       <nav className="px-4 py-3 border-b border-border shrink-0">
@@ -100,41 +149,11 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
         </button>
       </nav>
 
-      <div className="flex flex-1 flex-col lg:hidden">
-        <div className="border-r border-border overflow-hidden flex flex-col">
-          <CharacterContextPanel character={character} />
-        </div>
-
-        <div className="flex flex-col relative min-h-0 overflow-hidden">
-          <div className="flex-1 min-h-0 p-4">
-            <ChatInterface
-              activeMode={activeMode}
-              singleConversationId={lastSingleConversation?.id ?? null}
-              debateConversationId={lastDebateConversation?.id ?? null}
-              defaultCharacterId={character.id}
-              defaultCharacterName={character.name}
-              isInitialHistoryLoaded={isInitialHistoryLoaded}
-              onModeChange={handleModeChange}
-              onConversationCreated={handleConversationCreated}
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-col relative overflow-hidden">
-          <CharacterConversationHistory
-            character={character}
-            onSelectConversation={handleSelectConversation}
-            selectedConversationId={selectedConversationId}
-            onInitialHistoryLoaded={handleInitialHistoryLoaded}
-          />
-        </div>
-      </div>
-
-      <div className="hidden flex-1 lg:flex min-h-0">
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <div
           className={cn(
-            'border-r border-border overflow-hidden flex flex-col transition-all duration-300',
-            isHistoryOpen ? 'w-[40%]' : 'w-[55%]'
+            'overflow-hidden flex flex-col lg:border-r lg:border-border lg:transition-all lg:duration-300',
+            isHistoryOpen ? 'lg:w-[40%]' : 'lg:w-[55%]',
           )}
         >
           <CharacterContextPanel character={character} />
@@ -142,12 +161,12 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
 
         <div
           className={cn(
-            'relative flex min-h-0 flex-col overflow-hidden transition-all duration-300',
-            isHistoryOpen ? 'w-[45%]' : 'w-[60%]'
+            'relative flex min-h-0 flex-col overflow-hidden lg:transition-all lg:duration-300',
+            isHistoryOpen ? 'lg:w-[45%]' : 'lg:w-[60%]',
           )}
         >
           {!isHistoryOpen ? (
-            <div className="absolute right-4 top-4 z-10">
+            <div className="absolute right-4 top-4 z-10 hidden lg:block">
               {historyToggleButton}
             </div>
           ) : null}
@@ -168,17 +187,18 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
 
         <div
           className={cn(
-            'min-h-0 overflow-hidden transition-all duration-300',
-            isHistoryOpen ? 'w-[15%] opacity-100' : 'w-0 opacity-0 pointer-events-none'
+            'relative flex flex-col overflow-hidden border-t border-border lg:min-h-0 lg:border-l lg:border-t-0 lg:transition-all lg:duration-300',
+            isHistoryOpen ? 'lg:w-[15%] lg:opacity-100' : 'lg:w-0 lg:opacity-0 lg:pointer-events-none',
           )}
           aria-hidden={!isHistoryOpen}
         >
           <CharacterConversationHistory
             character={character}
+            conversations={conversations}
+            isLoadingConversations={isLoadingConversations}
             onSelectConversation={handleSelectConversation}
             selectedConversationId={selectedConversationId}
-            onInitialHistoryLoaded={handleInitialHistoryLoaded}
-            headerAction={historyToggleButton}
+            headerAction={desktopHistoryToggleButton}
           />
         </div>
       </div>

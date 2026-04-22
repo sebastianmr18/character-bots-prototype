@@ -37,11 +37,15 @@ export function CharacterEditorialPanel({
   const [currentPageIndex, setCurrentPageIndex] = useState(0)
   const [currentTimelineIndex, setCurrentTimelineIndex] = useState(0)
   const [currentGalleryIndex, setCurrentGalleryIndex] = useState(0)
+  const shouldLoadOverview = currentPageIndex === 1
+  const shouldLoadTimeline = currentPageIndex === 2
+  const shouldLoadRelations = currentPageIndex === 3
+  const shouldLoadGallery = currentPageIndex === 4
 
-  const overviewSection = useCharacterEditorialSection(character.id, 'overview', true)
-  const timelineSection = useCharacterEditorialSection(character.id, 'timeline', true)
-  const relationsSection = useCharacterEditorialSection(character.id, 'relations', true)
-  const gallerySection = useCharacterEditorialSection(character.id, 'gallery', true)
+  const overviewSection = useCharacterEditorialSection(character.id, 'overview', shouldLoadOverview)
+  const timelineSection = useCharacterEditorialSection(character.id, 'timeline', shouldLoadTimeline)
+  const relationsSection = useCharacterEditorialSection(character.id, 'relations', shouldLoadRelations)
+  const gallerySection = useCharacterEditorialSection(character.id, 'gallery', shouldLoadGallery)
 
   const editorialSections = useMemo(
     () => [
@@ -286,13 +290,26 @@ export function CharacterEditorialPanel({
   const currentPage = pages[currentPageIndex]
   const isFirstPage = currentPageIndex === 0
   const isLastPage = currentPageIndex === pages.length - 1
+  const isFirstPageNavigationLocked = isFirstPage && isHeroLoading
 
   const goToPreviousPage = () => {
     setCurrentPageIndex((prev) => Math.max(prev - 1, 0))
   }
 
   const goToNextPage = () => {
+    if (isFirstPageNavigationLocked) {
+      return
+    }
+
     setCurrentPageIndex((prev) => Math.min(prev + 1, pages.length - 1))
+  }
+
+  const goToPage = (index: number) => {
+    if (index > 0 && isFirstPageNavigationLocked) {
+      return
+    }
+
+    setCurrentPageIndex(index)
   }
 
   return (
@@ -331,9 +348,10 @@ export function CharacterEditorialPanel({
                 type="button"
                 aria-label={`Ir a ${page.title}`}
                 aria-current={currentPageIndex === index ? 'page' : undefined}
-                onClick={() => setCurrentPageIndex(index)}
+                onClick={() => goToPage(index)}
+                disabled={index > 0 && isFirstPageNavigationLocked}
                 className={cn(
-                  'h-2.5 rounded-full transition-all',
+                  'h-2.5 rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-50',
                   currentPageIndex === index ? 'w-8' : 'w-2.5 bg-border'
                 )}
                 style={currentPageIndex === index ? { backgroundColor: themeColor } : undefined}
@@ -345,7 +363,7 @@ export function CharacterEditorialPanel({
             type="button"
             variant="outline"
             onClick={goToNextPage}
-            disabled={isLastPage}
+            disabled={isLastPage || isFirstPageNavigationLocked}
             className="rounded-full"
           >
             Siguiente

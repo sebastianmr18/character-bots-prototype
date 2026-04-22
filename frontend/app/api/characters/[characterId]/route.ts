@@ -11,3 +11,12 @@ export async function GET(_request: Request, context: RouteContext) {
     backendPath: `/characters/${characterId}/`,
   })
 }
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  const { characterId } = await context.params
+  return proxyToBackend({
+    method: 'DELETE',
+    backendPath: `/characters/${characterId}/`,
+    requireAdmin: true,
+  })
+}

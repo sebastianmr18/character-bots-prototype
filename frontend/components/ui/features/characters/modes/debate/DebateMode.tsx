@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import type { Character } from "@/types/chat.types"
 import { DebatePicker } from "@/components/ui/features/characters/modes/debate/DebatePicker"
 import { DebateChatPanel } from "@/components/ui/features/characters/modes/debate/DebateChatPanel"
+import { DebatePanelSkeleton } from "@/components/ui/features/skeletons/DebatePanelSkeleton"
 import { useCharacters } from "@/hooks/useCharacters"
 import { getErrorMessage } from "@/utils/api.utils"
 import { normalizeBackendCharacter } from "@/utils/message.utils"
@@ -118,11 +119,7 @@ export const DebatePanel: React.FC<DebatePanelProps> = ({
   }
 
   if (isLoadingExisting) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-sm text-muted-foreground">Cargando debate...</p>
-      </div>
-    )
+    return <DebatePanelSkeleton />
   }
 
   return (
