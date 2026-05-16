@@ -6,7 +6,7 @@ jest.mock('@/utils/message.utils', () => ({
   hasAssistantAudio: jest.fn(() => false),
 }))
 
-import { renderHook, act, waitFor } from '@testing-library/react'
+import { renderHook, waitFor } from '@testing-library/react'
 import { useConversation } from '@/hooks/useConversationId'
 
 const mockCharacter = {

@@ -1,4 +1,4 @@
-import { render, screen, act } from '@testing-library/react'
+import { render, act } from '@testing-library/react'
 import { StreamingText } from '@/components/ui/features/characters/shared/StreamingText'
 
 describe('StreamingText', () => {

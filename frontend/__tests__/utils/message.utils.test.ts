@@ -5,8 +5,10 @@ import {
   hasAssistantAudio,
   mergeMessageCollection,
   normalizeAiMessagePayload,
+  type BackendMessage,
+  type BackendCharacter,
 } from '@/utils/message.utils'
-import type { Message } from '@/types/chat.types'
+import type { ComponentBlock, Message } from '@/types/chat.types'
 
 const makeMessage = (overrides: Partial<Message> = {}): Message => ({
   id: '1',
@@ -40,7 +42,7 @@ describe('normalizeBackendMessages', () => {
         speaker_character_id: 'char-1',
         speaker_name: 'Einstein',
         conversation_id: 'conv-1',
-      } as any,
+      } as BackendMessage,
     ])
 
     expect(msg.audioPath).toBe('/audio/1.mp3')
@@ -61,7 +63,7 @@ describe('normalizeBackendMessages', () => {
         content: 'Hi',
         audioUrl: 'https://camel.com/1.mp3',
         audio_url: 'https://snake.com/1.mp3',
-      } as any,
+      } as BackendMessage,
     ])
     expect(msg.audioUrl).toBe('https://camel.com/1.mp3')
   })
@@ -72,7 +74,7 @@ describe('normalizeBackendMessages', () => {
         id: '2',
         role: 'assistant',
         blocks: [{ type: 'text', content: 'Block text' }],
-      } as any,
+      } as BackendMessage,
     ])
     expect(msg.content).toBe('Block text')
     expect(msg.blocks?.[0].type).toBe('text')
@@ -91,9 +93,9 @@ describe('normalizeBackendMessages', () => {
             props: { dangerouslySetInnerHTML: '<script>xss</script>', title: 'Safe' },
           },
         ],
-      } as any,
+      } as BackendMessage,
     ])
-    const block = msg.blocks?.[0] as any
+    const block = msg.blocks?.[0] as ComponentBlock
     expect(block.props.dangerouslySetInnerHTML).toBeUndefined()
     expect(block.props.title).toBe('Safe')
   })
@@ -107,7 +109,7 @@ describe('normalizeBackendMessages', () => {
 
   it('normalizes event_type to eventType', () => {
     const [msg] = normalizeBackendMessages([
-      { id: '1', role: 'event', content: '', event_type: 'mode_switch' } as any,
+      { id: '1', role: 'event', content: '', event_type: 'mode_switch' } as BackendMessage,
     ])
     expect(msg.eventType).toBe('mode_switch')
   })
@@ -135,7 +137,7 @@ describe('normalizeBackendCharacter', () => {
       image_url: 'https://example.com/einstein.jpg',
       background_image_url: 'https://example.com/bg.jpg',
       public_slug: 'einstein',
-    } as any)
+    } as BackendCharacter)
 
     expect(char.voiceId).toBe('voice-123')
     expect(char.vectorDbName).toBe('einstein_db')
@@ -151,12 +153,12 @@ describe('normalizeBackendCharacter', () => {
       ...baseChar,
       voiceId: 'camel-voice',
       voice_id: 'snake-voice',
-    } as any)
+    } as BackendCharacter)
     expect(char.voiceId).toBe('camel-voice')
   })
 
   it('returns null for omitted optional fields', () => {
-    const char = normalizeBackendCharacter(baseChar as any)
+    const char = normalizeBackendCharacter(baseChar as BackendCharacter)
     expect(char.voiceId).toBeNull()
     expect(char.vectorDbName).toBeNull()
     expect(char.themeColor).toBeNull()
@@ -171,8 +173,8 @@ describe('normalizeBackendCharacters', () => {
 
   it('normalizes every character in the array', () => {
     const result = normalizeBackendCharacters([
-      { id: '1', name: 'A', description: '', role: '', biography: '', voice_id: 'v1' } as any,
-      { id: '2', name: 'B', description: '', role: '', biography: '', voice_id: 'v2' } as any,
+      { id: '1', name: 'A', description: '', role: '', biography: '', voice_id: 'v1' } as BackendCharacter,
+      { id: '2', name: 'B', description: '', role: '', biography: '', voice_id: 'v2' } as BackendCharacter,
     ])
     expect(result[0].voiceId).toBe('v1')
     expect(result[1].voiceId).toBe('v2')

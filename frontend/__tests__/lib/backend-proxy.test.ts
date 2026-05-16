@@ -21,7 +21,7 @@ const mockFetchResponse = (
   status,
   ok: status >= 200 && status < 300,
   text: () => Promise.resolve(body),
-  headers: { get: (_: string) => contentType },
+  headers: { get: () => contentType },
 })
 
 describe('proxyToBackend', () => {
