@@ -27,7 +27,7 @@ type BackendComponentBlock = {
 
 type BackendMessageBlock = BackendTextBlock | BackendComponentBlock
 
-type BackendMessage = {
+export type BackendMessage = {
   id: number | string
   role: "user" | "assistant" | "system" | "event"
   content?: string
@@ -58,7 +58,7 @@ type BackendMessage = {
   speaker_name?: string | null
 }
 
-type BackendCharacter = Omit<Character, "voiceId" | "vectorDbName" | "imageUrl" | "backgroundImageUrl"> & {
+export type BackendCharacter = Omit<Character, "voiceId" | "vectorDbName" | "imageUrl" | "backgroundImageUrl"> & {
   publicSlug?: string | null
   public_slug?: string | null
   voiceId?: string | null
