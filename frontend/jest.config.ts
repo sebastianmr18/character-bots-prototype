@@ -1,3 +1,7 @@
+/**
+ * Configuración de Jest con entorno jsdom y alias `@/` para pruebas del frontend.
+ */
+
 import type { Config } from 'jest'
 import nextJest from 'next/jest.js'
 

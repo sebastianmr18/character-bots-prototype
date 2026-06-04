@@ -1,3 +1,10 @@
+/**
+ * Chat Message Skeleton: esqueleto de carga para Chat Message.
+ */
+/**
+ * Esqueleto de carga para Chat Message.
+ */
+
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface ChatMessageSkeletonProps {

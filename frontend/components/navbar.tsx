@@ -1,4 +1,12 @@
+/**
+ * Navbar: componente o módulo Navbar.
+ */
 'use client'
+
+
+/**
+ * Componente o módulo Navbar.
+ */
 
 import Link from 'next/link'
 import { useState } from 'react'

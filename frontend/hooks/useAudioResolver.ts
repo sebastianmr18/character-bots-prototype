@@ -3,11 +3,20 @@ import type React from 'react'
 import type { Message } from '@/types/chat.types'
 import { normalizeBackendMessages } from '@/utils/message.utils'
 
+/** Resultado de resolución de URL de audio para un mensaje. */
 export interface AudioResolverResult {
   audioUrl: string | null
   mediaType: string | null
 }
 
+/**
+ * Resuelve la URL de audio de un mensaje desde el estado local o refrescando la conversación.
+ *
+ * @param conversationId - Conversación del mensaje.
+ * @param messages - Lista actual (caché local).
+ * @param setMessages - Setter para actualizar mensajes con la URL obtenida.
+ * @returns Función async `(messageId, forceRefresh?)` que devuelve URL y MIME.
+ */
 export const useAudioResolver = (
   conversationId: string | null,
   messages: Message[],

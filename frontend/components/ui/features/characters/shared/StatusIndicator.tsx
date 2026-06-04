@@ -1,3 +1,7 @@
+/**
+ * Muestra el estado de conexión o flujo con color e icono según `status.utils`.
+ */
+
 import type React from "react"
 import { getStatusDisplay } from "@/utils/status.utils"
 
@@ -5,6 +9,7 @@ interface StatusIndicatorProps {
   status: string
 }
 
+/** Píldora de estado con estilos derivados de la etiqueta de texto. */
 export const StatusIndicator: React.FC<StatusIndicatorProps> = ({ status }) => {
   const statusDisplay = getStatusDisplay(status)
 

@@ -1,4 +1,12 @@
+/**
+ * Gallery Page Skeleton: sección editorial: Gallery Page.
+ */
 'use client'
+
+
+/**
+ * Sección editorial: Gallery Page.
+ */
 
 import Image from 'next/image'
 import { ArrowLeft, ArrowRight } from 'lucide-react'

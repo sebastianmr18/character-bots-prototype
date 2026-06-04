@@ -1,5 +1,9 @@
 "use client"
 
+/**
+ * Panel de chat en modo debate entre dos personajes (WebSocket y entrada de usuario).
+ */
+
 import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
 import { ArrowLeft, Mic, MicOff, Send, Swords } from "lucide-react"
@@ -27,6 +31,7 @@ const getThemeColor = (character: Character) =>
 const getShortName = (character: Character) => character.name.split(" ")[0]
 const getEpoch = (character: Character) => character.years ?? ""
 
+/** Gestiona turnos, estado, mensajes y grabación en una conversación de debate. */
 export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
   conversationId,
   characterA,
@@ -53,6 +58,15 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
     }
   }, [conversationId])
 
+  const getSpeakerSkipMetadata = useCallback(
+    (speakerId: string) => {
+      if (speakerId === characterA.id) return characterA.debateSkipMetadata ?? null
+      if (speakerId === characterB.id) return characterB.debateSkipMetadata ?? null
+      return null
+    },
+    [characterA, characterB],
+  )
+
   const {
     messages,
     setMessages,
@@ -72,6 +86,7 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
     conversationId,
     onStatusChange: setStatus,
     fetchConversationMessages: loadHistory,
+    getSpeakerSkipMetadata,
   })
 
   const { isRecording, audioLevel, startRecording, stopRecording, errorMessage, clearError } =

@@ -1,3 +1,7 @@
+/**
+ * Página de detalle de personaje: resuelve el slug URL y renderiza el perfil conversacional.
+ */
+
 import CharacterProfile from '@/components/ui/features/characters/core/CharacterProfile'
 import { CharacterNotFoundState } from '@/components/ui/features/characters/core/module'
 import { createClient } from '@/lib/supabase/server'
@@ -46,6 +50,7 @@ async function fetchCharacterBySlug(slug: string): Promise<Character | null> {
   return normalizeBackendCharacter(data)
 }
 
+/** Server Component que carga el personaje por slug y muestra perfil o estado no encontrado. */
 export default async function PersonajeDetallePage({ params }: PersonajeDetallePageProps) {
   const { nombrePersonaje } = await params
   const character = await fetchCharacterBySlug(nombrePersonaje)

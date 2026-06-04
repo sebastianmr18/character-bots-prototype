@@ -2,10 +2,11 @@
 import { useRef, useCallback } from 'react'
 
 /**
- * Creates and manages a single AudioContext instance.
- * - Handles `webkitAudioContext` fallback for older browsers.
- * - Optionally loads an AudioWorklet module on first creation.
- * - Auto-resumes a `suspended` context on each `init()` call.
+ * Crea y reutiliza una instancia de `AudioContext` (fallback `webkitAudioContext`).
+ *
+ * @param sampleRate - Frecuencia de muestreo del contexto.
+ * @param workletUrl - URL opcional de AudioWorklet a registrar en la primera inicialización.
+ * @returns Referencia al contexto y función `init` que reanuda si estaba suspendido.
  */
 export const useAudioContext = (sampleRate: number, workletUrl?: string) => {
   const contextRef = useRef<AudioContext | null>(null)

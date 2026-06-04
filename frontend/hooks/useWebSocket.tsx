@@ -24,6 +24,12 @@ interface UseWebSocketChatProps {
   onSuggestionsReceived?: (suggestions: string[]) => void
 }
 
+/**
+ * Conexión Socket.IO de chat: mensajes de texto/audio, transcripción y sugerencias con fallback a polling.
+ *
+ * @param props - Id de conversación y personaje, callbacks de estado, mensajes y transcripción.
+ * @returns `sendMessage`, `sendAudioMessage`, `isConnected` e `isTyping`.
+ */
 export const useWebSocketChat = ({
   conversationId,
   selectedCharacterId,

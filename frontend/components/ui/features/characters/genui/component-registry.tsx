@@ -1,3 +1,10 @@
+/**
+ * Render Registered Component: renderizado GenUI: Component-registry.
+ */
+/**
+ * Renderizado GenUI: Component-registry.
+ */
+
 import type React from "react"
 import type { UIComponentName } from "@/types/chat.types"
 import { InfoCard, parseInfoCardProps } from "./blocks/InfoCard"

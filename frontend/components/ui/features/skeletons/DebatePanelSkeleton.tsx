@@ -1,3 +1,10 @@
+/**
+ * Debate Panel Skeleton: esqueleto de carga para Debate Panel.
+ */
+/**
+ * Esqueleto de carga para Debate Panel.
+ */
+
 import { Skeleton } from '@/components/ui/skeleton'
 
 export function DebatePanelSkeleton() {

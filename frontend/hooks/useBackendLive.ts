@@ -7,6 +7,13 @@ import { LIVE_WS_URL } from '@/constants/chat.constants'
 
 const OUTPUT_SAMPLE_RATE = 24000
 
+/**
+ * Sesión de voz en vivo vía Socket.IO: captura micrófono, reproduce audio del modelo y mantiene historial.
+ *
+ * @param systemInstruction - Instrucción de sistema enviada al backend Live.
+ * @param characterId - Personaje asociado a la sesión.
+ * @returns Estado de conexión, historial, controles de mute y funciones start/stop/interrupt.
+ */
 export const useBackendLive = (systemInstruction: string, characterId: string) => {
   const [status, setStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED)
   const [history, setHistory] = useState<Transcription[]>([])

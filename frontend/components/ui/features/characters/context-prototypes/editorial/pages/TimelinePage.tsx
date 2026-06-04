@@ -1,4 +1,12 @@
+/**
+ * Timeline Page Skeleton: sección editorial: Timeline Page.
+ */
 'use client'
+
+
+/**
+ * Sección editorial: Timeline Page.
+ */
 
 import { Clock3, Users } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'

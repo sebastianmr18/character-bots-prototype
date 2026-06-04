@@ -1,5 +1,9 @@
 "use client"
 
+/**
+ * Entrada de texto, sugerencias rápidas y botón de micrófono para el chat.
+ */
+
 import type React from "react"
 import { useState } from "react"
 import { Mic, Send } from "lucide-react"
@@ -25,6 +29,7 @@ interface ChatInputProps {
   status?: string
 }
 
+/** Barra de envío de mensajes y activación de grabación de voz. */
 export const ChatInput: React.FC<ChatInputProps> = ({
   isRecording,
   isConnected,

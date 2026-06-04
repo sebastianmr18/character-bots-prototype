@@ -1,8 +1,13 @@
 'use client'
 
+
+/**
+ * Página de la ruta / en la aplicación.
+ */
+
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Sparkles, Phone, Users, GraduationCap, Swords } from 'lucide-react'
+import { ArrowRight, Sparkles, Phone, Users, Swords, History, Lightbulb, ScrollText } from 'lucide-react'
 
 const modes = [
   {
@@ -16,14 +21,24 @@ const modes = [
     description: 'Enfrenta a dos grandes mentes en un debate sobre temas fascinantes.',
   },
   {
-    icon: GraduationCap,
-    title: 'Modo Profesor',
-    description: 'Aprende de los expertos con lecciones estructuradas y personalizadas.',
-  },
-  {
     icon: Users,
     title: 'Modo Entrevista',
     description: 'Conduce tu propia entrevista y descubre detalles ineditos de sus vidas.',
+  },
+  {
+    icon: History,
+    title: 'Historial de conversaciones',
+    description: 'Retoma conversaciones previas con cada personaje cuando quieras.',
+  },
+  {
+    icon: Lightbulb,
+    title: 'Sugerencias de preguntas',
+    description: 'Desbloquea ideas rapidas para empezar o continuar la conversacion.',
+  },
+  {
+    icon: ScrollText,
+    title: 'Contexto del personaje',
+    description: 'Consulta biografia, temas y contexto antes de entrar al chat.',
   },
 ];
 
@@ -107,13 +122,11 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {modes.map((mode, index) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {modes.map((mode) => (
             <div
               key={mode.title}
-              className={`group p-6 rounded-xl bg-background border border-border hover:border-primary/30 hover:shadow-lg transition-all duration-300 ${
-                index === modes.length - 1 && modes.length % 3 === 2 ? 'lg:col-span-1' : ''
-              } ${index >= modes.length - 2 && modes.length % 3 !== 0 ? 'md:col-span-1' : ''}`}
+              className="group p-6 rounded-xl bg-background border border-border hover:border-primary/30 hover:shadow-lg transition-all duration-300"
             >
               <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
                 <mode.icon className="h-6 w-6 text-primary" />

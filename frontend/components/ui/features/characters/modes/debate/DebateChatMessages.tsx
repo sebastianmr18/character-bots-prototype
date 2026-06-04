@@ -1,9 +1,20 @@
 "use client"
 
+/**
+ * Lista de mensajes del debate con colores por personaje, audio y eventos de omisión.
+ */
+
 import type React from "react"
 import { useCallback } from "react"
-import type { Character, DebateMessageMetadata, DebateWarningPayload, Message } from "@/types/chat.types"
+import type {
+  Character,
+  DebateMessageMetadata,
+  DebateSkipMetadata,
+  DebateWarningPayload,
+  Message,
+} from "@/types/chat.types"
 import { AudioMessagePlayer } from "@/components/ui/features/characters/shared/AudioMessagePlayer"
+import { MessageCopyAction } from "@/components/ui/features/characters/shared/MessageCopyAction"
 import { TypingIndicator } from "@/components/ui/features/characters/modes/chat/TypingIndicator"
 import { StreamingText } from "@/components/ui/features/characters/shared/StreamingText"
 import { colorFromName, lightColorFromName } from "@/utils/character.utils"
@@ -29,6 +40,29 @@ const getShortName = (character: Character) => character.name.split(" ")[0]
 const makePassthroughResolver = (audioUrl: string | null | undefined) =>
   async () => ({ audioUrl: audioUrl ?? null, mediaType: "audio/mpeg" as string | null })
 
+const skipReasonLabel = (reason: string | undefined): string => {
+  if (reason === "manual" || reason === "manual_user") return "omitido manualmente"
+  if (reason === "auto_low_confidence") return "baja confianza"
+  if (reason === "not_applicable") return "no aplica al marco del personaje"
+  if (reason === "strategy") return "estrategia de debate"
+  return "motivo no especificado"
+}
+
+const asEventMeta = (message: Message): Record<string, unknown> =>
+  (message.eventMetaJson ?? {}) as Record<string, unknown>
+
+const readSpeakerSkipMetadata = (
+  speakerId: string | null | undefined,
+  characterA: Character,
+  characterB: Character,
+): DebateSkipMetadata | null => {
+  if (!speakerId) return null
+  if (speakerId === characterA.id) return characterA.debateSkipMetadata ?? null
+  if (speakerId === characterB.id) return characterB.debateSkipMetadata ?? null
+  return null
+}
+
+/** Renderiza burbujas, indicador de escritura y metadatos de turno omitido. */
 export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
   conversationId,
   messages,
@@ -56,20 +90,27 @@ export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
         ? characterB
         : null
 
-  const skipReasonLabel = (reason: string | undefined): string => {
-    if (reason === "manual" || reason === "manual_user") return "el usuario lo omitió"
-    if (reason === "auto_low_confidence") return "baja confianza"
-    return "motivo desconocido"
-  }
-
   return (
     <>
       {messages.map((message) => {
         if (message.role === "event" && message.eventType === "debate_turn_skip") {
-          const meta = message.eventMetaJson
-          const name = (meta?.speakerName as string | undefined) ?? message.speakerName ?? "Personaje"
-          const reason = (meta?.reason as string | undefined)
-          const reasonDetail = (meta?.reasonDetail as string | undefined)
+          const meta = asEventMeta(message)
+          const speakerId =
+            (meta.speakerId as string | undefined) ??
+            (meta.speaker_id as string | undefined) ??
+            message.speakerId
+          const speakerSkipFallback = readSpeakerSkipMetadata(speakerId, characterA, characterB)
+          const name = (meta.speakerName as string | undefined) ?? message.speakerName ?? "Personaje"
+          const reason =
+            (meta.reason as string | undefined) ??
+            (message.metadata as DebateMessageMetadata | undefined)?.skipReason ??
+            speakerSkipFallback?.reason
+          const reasonDetail =
+            (meta.reasonDetail as string | undefined) ??
+            (meta.reason_detail as string | undefined) ??
+            (message.metadata as DebateMessageMetadata | undefined)?.skipReasonDetail ??
+            speakerSkipFallback?.reasonDetail ??
+            undefined
           return (
             <div key={String(message.id)} className="flex justify-center">
               <div
@@ -81,6 +122,7 @@ export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
                   <span className="font-medium">{name}</span>
                   {" omitió su turno"}
                   {reason ? ` — ${skipReasonLabel(reason)}` : ""}
+                  {reasonDetail ? `: ${reasonDetail}` : ""}
                 </span>
               </div>
             </div>
@@ -100,6 +142,9 @@ export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
 
         const debateMetadata = message.metadata as DebateMessageMetadata | undefined
         const isSkipped = debateMetadata?.isSkipped === true
+        const speakerSkipFallback = readSpeakerSkipMetadata(message.speakerId, characterA, characterB)
+        const skipReason = debateMetadata?.skipReason ?? speakerSkipFallback?.reason
+        const skipReasonDetail = debateMetadata?.skipReasonDetail ?? speakerSkipFallback?.reasonDetail
 
         // Determine which character is speaking
         const isCharA = message.speakerId === characterA.id
@@ -148,10 +193,24 @@ export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
                 className={`rounded-2xl px-4 py-3 ${isCharA ? "rounded-bl-md" : "rounded-br-md"}`}
                 style={{ backgroundColor: themeColorLight }}
               >
+                <div className="flex justify-end -mt-1 -mr-1 mb-1">
+                  <MessageCopyAction
+                    text={message.content}
+                    className="size-6 text-foreground/60 hover:text-foreground"
+                  />
+                </div>
+
                 {isSkipped ? (
-                  <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap break-words italic">
-                    {message.content}
-                  </p>
+                  <>
+                    <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap break-words italic">
+                      {message.content}
+                    </p>
+                    {(skipReason || skipReasonDetail) && (
+                      <p className="mt-2 text-xs text-foreground/70">
+                        Motivo: {skipReasonDetail ?? skipReasonLabel(skipReason)}
+                      </p>
+                    )}
+                  </>
                 ) : (
                   <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
                     <StreamingText

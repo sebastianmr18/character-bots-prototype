@@ -1,0 +1,39 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "Character Bots — Frontend",
+  "entryPoints": [
+    "types",
+    "utils",
+    "hooks",
+    "lib",
+    "constants",
+    "components/ui/features",
+    "components/navbar.tsx",
+    "components/footer.tsx",
+    "app/api",
+    "app/providers.tsx",
+    "app/layout.tsx",
+    "middleware.ts"
+  ],
+  "entryPointStrategy": "expand",
+  "out": "docs",
+  "tsconfig": "tsconfig.typedoc.json",
+  "exclude": [
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/node_modules/**",
+    "**/.next/**"
+  ],
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeExternals": true,
+  "includeVersion": true,
+  "readme": "none",
+  "categorizeByGroup": true,
+  "sort": ["source-order"],
+  "validation": {
+    "notDocumented": false,
+    "notExported": false
+  }
+}

@@ -1,7 +1,12 @@
+/**
+ * Normalización de mensajes y personajes desde el backend (snake_case, bloques GenUI, audio).
+ */
+
 import type {
   AiMessagePayload,
   Character,
   ComponentBlock,
+  DebateSkipMetadata,
   Message,
   MessageBlock,
   MessageSchemaVersion,
@@ -27,6 +32,7 @@ type BackendComponentBlock = {
 
 type BackendMessageBlock = BackendTextBlock | BackendComponentBlock
 
+/** Mensaje tal como lo devuelve el backend, con alias en snake_case. */
 export type BackendMessage = {
   id: number | string
   role: "user" | "assistant" | "system" | "event"
@@ -58,6 +64,7 @@ export type BackendMessage = {
   speaker_name?: string | null
 }
 
+/** Personaje del backend con campos duplicados en camelCase y snake_case. */
 export type BackendCharacter = Omit<Character, "voiceId" | "vectorDbName" | "imageUrl" | "backgroundImageUrl"> & {
   publicSlug?: string | null
   public_slug?: string | null
@@ -71,6 +78,64 @@ export type BackendCharacter = Omit<Character, "voiceId" | "vectorDbName" | "ima
   image_url?: string | null
   backgroundImageUrl?: string | null
   background_image_url?: string | null
+  debateSkipMetadata?: DebateSkipMetadata | null
+  debate_skip_metadata?: DebateSkipMetadata | null
+  debateSkipJson?: DebateSkipMetadata | null
+  debate_skip_json?: DebateSkipMetadata | null
+  skipTurnMetadata?: DebateSkipMetadata | null
+  skip_turn_metadata?: DebateSkipMetadata | null
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+const asStringOrNull = (value: unknown): string | null => {
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+const asNumberOrNull = (value: unknown): number | null => {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null
+  return value
+}
+
+const normalizeDebateSkipMetadata = (value: unknown): DebateSkipMetadata | null => {
+  if (!isRecord(value)) return null
+
+  const reason = asStringOrNull(value.reason)
+  const reasonDetail =
+    asStringOrNull(value.reasonDetail) ?? asStringOrNull(value.reason_detail)
+  const confidence = asNumberOrNull(value.confidence)
+  const rawTurnOrder = asStringOrNull(value.turnOrder) ?? asStringOrNull(value.turn_order)
+  const turnOrder = rawTurnOrder === "A" || rawTurnOrder === "B" || rawTurnOrder === "forced"
+    ? rawTurnOrder
+    : null
+  const isForced =
+    typeof value.isForced === "boolean"
+      ? value.isForced
+      : typeof value.is_forced === "boolean"
+        ? value.is_forced
+        : undefined
+
+  if (!reason && !reasonDetail && confidence == null && turnOrder == null && isForced == null) {
+    return null
+  }
+
+  return {
+    reason: reason ?? undefined,
+    reasonDetail,
+    confidence,
+    turnOrder,
+    isForced,
+  }
+}
+
+const firstNonNull = <T>(...values: Array<T | null | undefined>): T | null => {
+  for (const value of values) {
+    if (value != null) return value
+  }
+  return null
 }
 
 const sanitizeValue = (value: unknown): unknown => {
@@ -184,10 +249,22 @@ const normalizeBackendMessage = (message: BackendMessage): Message => {
   }
 }
 
+/**
+ * Convierte una lista de mensajes del backend al modelo de cliente.
+ *
+ * @param messages - Mensajes crudos; por defecto lista vacía.
+ * @returns Mensajes con `camelCase` y bloques sanitizados.
+ */
 export const normalizeBackendMessages = (messages: BackendMessage[] = []): Message[] => {
   return messages.map(normalizeBackendMessage)
 }
 
+/**
+ * Normaliza un personaje del backend unificando alias de campos y metadatos de debate.
+ *
+ * @param character - Personaje con posibles claves snake_case.
+ * @returns `Character` listo para la UI.
+ */
 export const normalizeBackendCharacter = (character: BackendCharacter): Character => ({
   ...character,
   publicSlug: character.publicSlug ?? character.public_slug ?? null,
@@ -197,8 +274,24 @@ export const normalizeBackendCharacter = (character: BackendCharacter): Characte
   themeColorLight: character.themeColorLight ?? character.theme_color_light ?? null,
   imageUrl: character.imageUrl ?? character.image_url ?? null,
   backgroundImageUrl: character.backgroundImageUrl ?? character.background_image_url ?? null,
+  debateSkipMetadata: normalizeDebateSkipMetadata(
+    firstNonNull(
+      character.debateSkipMetadata,
+      character.debate_skip_metadata,
+      character.debateSkipJson,
+      character.debate_skip_json,
+      character.skipTurnMetadata,
+      character.skip_turn_metadata,
+    ),
+  ),
 })
 
+/**
+ * Normaliza una colección de personajes del backend.
+ *
+ * @param characters - Lista cruda; por defecto vacía.
+ * @returns Personajes en formato de cliente.
+ */
 export const normalizeBackendCharacters = (characters: BackendCharacter[] = []): Character[] => {
   return characters.map(normalizeBackendCharacter)
 }
@@ -207,6 +300,12 @@ export const normalizeBackendCharacters = (characters: BackendCharacter[] = []):
 // Message collection helpers (used by useWebSocket and useMessagePolling)
 // ---------------------------------------------------------------------------
 
+/**
+ * Indica si el mensaje del asistente incluye audio reproducible (URL, ruta o storage id).
+ *
+ * @param message - Mensaje a evaluar.
+ * @returns `true` si hay al menos una referencia de audio válida.
+ */
 export const hasAssistantAudio = (message: Message): boolean =>
   Boolean(message.audioUrl || message.audioPath || message.audioStorageId)
 
@@ -245,6 +344,13 @@ const mergeMessagesSafely = (current: Message, incoming: Message): Message => {
   }
 }
 
+/**
+ * Incorpora mensajes entrantes (WebSocket o polling) sin duplicar por id o por rol+contenido.
+ *
+ * @param prev - Lista actual en estado de React.
+ * @param incomingMessages - Mensajes nuevos o actualizados.
+ * @returns Nueva referencia de array solo si hubo cambios reales.
+ */
 export const mergeMessageCollection = (
   prev: Message[],
   incomingMessages: Message[],
@@ -289,6 +395,12 @@ export const mergeMessageCollection = (
   return didChange ? next : prev
 }
 
+/**
+ * Convierte el payload de un mensaje de IA (WebSocket) al tipo `Message` del cliente.
+ *
+ * @param payload - Cuerpo del evento con alias snake_case opcionales.
+ * @returns Mensaje del asistente normalizado, incluyendo sugerencias en metadata si vienen.
+ */
 export const normalizeAiMessagePayload = (payload: AiMessagePayload): Message => {
   const messageText = payload.text ?? payload.content ?? ""
   const messageId = payload.message_id ?? payload.messageId ?? `ws-${Date.now()}`

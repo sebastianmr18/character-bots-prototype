@@ -1,3 +1,10 @@
+/**
+ * Character Not Found State: componente o módulo Module.
+ */
+/**
+ * Componente o módulo Module.
+ */
+
 import Link from 'next/link'
 import { MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'

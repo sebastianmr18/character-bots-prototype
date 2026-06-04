@@ -1,4 +1,12 @@
+/**
+ * Streaming Text: componente o módulo Streaming Text.
+ */
 "use client"
+
+
+/**
+ * Componente o módulo Streaming Text.
+ */
 
 import { useEffect, useMemo, useState } from "react"
 

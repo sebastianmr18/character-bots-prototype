@@ -51,7 +51,8 @@ export async function updateSession(request: NextRequest) {
   const isProtectedRoute = path.startsWith('/personajes') ||
                            path.startsWith('/uploads') ||
                            path.startsWith('/call') ||
-                           path.startsWith('/profile')
+                           path.startsWith('/profile') ||
+                           path.startsWith('/mi-perfil')
 
 // 2. Lógica de redirección
   if (!user && isProtectedRoute) {

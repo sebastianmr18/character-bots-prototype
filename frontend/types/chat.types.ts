@@ -58,6 +58,7 @@ export interface Character {
   topics?: string[] | null
   imageUrl?: string | null
   backgroundImageUrl?: string | null
+  debateSkipMetadata?: DebateSkipMetadata | null
 }
 
 export interface Conversation {
@@ -90,6 +91,14 @@ export type DebateSkipReason =
   | "not_applicable"
   | "strategy"
   | "unknown"
+
+export interface DebateSkipMetadata {
+  reason?: DebateSkipReason | string
+  isForced?: boolean
+  turnOrder?: DebateTurnOrder | null
+  confidence?: number | null
+  reasonDetail?: string | null
+}
 
 export interface DebateWarningPayload {
   code: string
@@ -158,7 +167,7 @@ export interface DebateTurnSkippedPayload {
   speaker_id: string
   speaker_name: string
   turn_order: DebateTurnOrder
-  turnOrder?: number
+  turnOrder?: DebateTurnOrder
   is_forced?: boolean
   reason: DebateSkipReason
   reasonDetail?: string
@@ -226,6 +235,13 @@ export interface CharacterKnowledgeBaseUploadResponse {
 export type UserRole = 'admin' | 'user'
 
 export interface MeProfile {
+  id: string
+  username: string
+  role: UserRole
+  createdAt: string
+}
+
+export interface AdminUser {
   id: string
   username: string
   role: UserRole

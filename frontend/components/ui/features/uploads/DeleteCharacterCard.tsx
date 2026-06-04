@@ -1,4 +1,12 @@
+/**
+ * Delete Character Card: panel de administración/cargas: Delete Character Card.
+ */
 'use client'
+
+
+/**
+ * Panel de administración/cargas: Delete Character Card.
+ */
 
 import { useMemo, useState } from 'react'
 import { AlertTriangle, Loader2, Trash2 } from 'lucide-react'
@@ -31,6 +39,7 @@ export function DeleteCharacterCard({ refreshKey, onCharacterDeleted }: DeleteCh
     {
       storageKey: 'uploads_delete_character_id',
       refreshKey,
+      apiEndpoint: '/api/admin/characters?limit=100',
     },
   )
 

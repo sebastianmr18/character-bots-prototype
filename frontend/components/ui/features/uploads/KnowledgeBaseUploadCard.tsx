@@ -1,4 +1,12 @@
+/**
+ * Knowledge Base Upload Card: panel de administración/cargas: Knowledge Base Upload Card.
+ */
 'use client'
+
+
+/**
+ * Panel de administración/cargas: Knowledge Base Upload Card.
+ */
 
 import { useState, type ChangeEvent } from 'react'
 import { Loader2, Upload, FileText, CheckCircle2 } from 'lucide-react'
@@ -40,6 +48,7 @@ export function KnowledgeBaseUploadCard({ refreshKey }: KnowledgeBaseUploadCardP
     {
       storageKey: 'uploads_kb_character_id',
       refreshKey,
+      apiEndpoint: '/api/admin/characters?limit=100',
     },
   )
 

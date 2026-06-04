@@ -1,3 +1,10 @@
+/**
+ * Conversation Item Skeleton: esqueleto de carga para Conversation Item.
+ */
+/**
+ * Esqueleto de carga para Conversation Item.
+ */
+
 import { Skeleton } from '@/components/ui/skeleton'
 
 export function ConversationItemSkeleton() {

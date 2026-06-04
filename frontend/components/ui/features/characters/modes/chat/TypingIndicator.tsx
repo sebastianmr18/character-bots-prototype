@@ -1,5 +1,10 @@
+/**
+ * Indicador visual de que el asistente está escribiendo.
+ */
+
 import type React from "react"
 
+/** Tres puntos animados con etiqueta accesible "Escribiendo". */
 export const TypingIndicator: React.FC = () => {
   return (
     <div className="flex items-center gap-1" aria-label="Escribiendo" role="status">

@@ -1,3 +1,8 @@
+/**
+ * Utilidades de presentación y enrutamiento para personajes (colores, slugs, búsqueda).
+ */
+
+/** Hash determinístico simple para derivar un matiz de color a partir de texto. */
 function hashString(str: string): number {
   let hash = 0
   for (let i = 0; i < str.length; i++) {
@@ -8,7 +13,10 @@ function hashString(str: string): number {
 
 /**
  * Genera un color oklch determinístico a partir del nombre del personaje.
- * Si el personaje tiene `themeColor` en sus datos, ese valor tiene prioridad.
+ *
+ * @param name - Nombre del personaje.
+ * @returns Cadena de color oklch oscuro.
+ * @remarks Si el personaje define `themeColor` en sus datos, la UI debe preferir ese valor.
  */
 export function colorFromName(name: string): string {
   const hue = hashString(name) % 360
@@ -16,7 +24,10 @@ export function colorFromName(name: string): string {
 }
 
 /**
- * Versión clara del color derivado del nombre (fondos, áreas ambient).
+ * Versión clara del color derivado del nombre, apta para fondos y áreas ambientales.
+ *
+ * @param name - Nombre del personaje.
+ * @returns Cadena de color oklch claro.
  */
 export function lightColorFromName(name: string): string {
   const hue = hashString(name) % 360
@@ -24,22 +35,28 @@ export function lightColorFromName(name: string): string {
 }
 
 /**
- * Convierte el nombre de un personaje a un slug URL-safe.
- * Ejemplo: "Simón Bolívar" → "simon-bolivar"
+ * Convierte el nombre de un personaje a un slug seguro para URL.
+ *
+ * @param name - Nombre con posibles tildes y espacios.
+ * @returns Slug en minúsculas; p. ej. "Simón Bolívar" → "simon-bolivar".
  */
 export function toSlug(name: string): string {
   return name
-    .normalize('NFD')                      // descompone caracteres con diacríticos
-    .replace(/[\u0300-\u036f]/g, '')       // elimina marcas de diacríticos (tildes, etc.)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9\s-]/g, '')         // elimina caracteres especiales (excepto espacios y guiones)
-    .replace(/\s+/g, '-')                  // reemplaza espacios por guiones
-    .replace(/-+/g, '-')                   // colapsa guiones consecutivos
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
 }
 
 /**
- * Busca un personaje en una lista por slug derivado de su nombre.
+ * Busca un personaje en una lista comparando el slug derivado de su nombre.
+ *
+ * @param characters - Colección de objetos con al menos `name`.
+ * @param slug - Slug de la ruta (segmento URL).
+ * @returns El elemento coincidente o `undefined`.
  */
 export function findCharacterBySlug<T extends { name: string }>(
   characters: T[],

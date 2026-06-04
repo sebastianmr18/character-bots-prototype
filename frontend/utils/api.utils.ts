@@ -1,6 +1,9 @@
 /**
- * Extracts a human-readable error message from a failed fetch Response.
- * Tries to read `error` or `details` from the JSON body; falls back to the HTTP status.
+ * Obtiene un mensaje de error legible a partir de una respuesta `fetch` fallida.
+ * Intenta leer `error` o `details` del cuerpo JSON; si no hay JSON, usa el código HTTP.
+ *
+ * @param response - Respuesta HTTP no exitosa.
+ * @returns Texto de error para mostrar al usuario o registrar.
  */
 export async function getErrorMessage(response: Response): Promise<string> {
   try {
