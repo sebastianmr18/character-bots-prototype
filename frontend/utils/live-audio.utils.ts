@@ -1,6 +1,9 @@
 /**
- * Converts a base64-encoded audio string to an object URL for use in
- * HTML audio elements or the Web Audio API.
+ * Convierte audio codificado en base64 a una URL de objeto para elementos `<audio>` o Web Audio API.
+ *
+ * @param base64String - Datos de audio en base64 (se eliminan espacios en blanco).
+ * @param mediaType - MIME del blob; por defecto `audio/mpeg`.
+ * @returns URL de objeto que debe revocarse con `URL.revokeObjectURL` cuando ya no se use.
  */
 export function base64ToObjectUrl(
   base64String: string,

@@ -1,3 +1,7 @@
+/**
+ * Configuración de Next.js (salida standalone opcional para builds Docker).
+ */
+
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {

@@ -1,5 +1,10 @@
 "use client"
 
+
+/**
+ * Página de la ruta /login en la aplicación.
+ */
+
 import React from "react";
 import Link from "next/link";
 import { createClient } from '@/lib/supabase/client'

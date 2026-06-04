@@ -4,6 +4,12 @@ import { useRef, useState, useCallback, useEffect } from "react"
 
 const AUDIO_MIME_TYPE = "audio/webm;codecs=opus"
 
+/**
+ * Crea un `MediaRecorder` en WebM/Opus si el navegador lo soporta.
+ *
+ * @param stream - Flujo de micrófono.
+ * @throws Si el MIME `audio/webm;codecs=opus` no está soportado.
+ */
 export const getMediaRecorder = (stream: MediaStream): MediaRecorder => {
   if (!MediaRecorder.isTypeSupported(AUDIO_MIME_TYPE)) {
     throw new Error(`El formato ${AUDIO_MIME_TYPE} no está soportado en este navegador.`)
@@ -12,6 +18,11 @@ export const getMediaRecorder = (stream: MediaStream): MediaRecorder => {
   return new MediaRecorder(stream, { mimeType: AUDIO_MIME_TYPE })
 }
 
+/**
+ * Graba audio del micrófono con nivel visual y devuelve blob base64 al detener.
+ *
+ * @returns Estado de grabación, nivel, errores y funciones `start` / `stop` / `clearError`.
+ */
 export const useVoiceRecording = () => {
   const mediaRecorder = useRef<MediaRecorder | null>(null)
   const audioChunks = useRef<Blob[]>([])

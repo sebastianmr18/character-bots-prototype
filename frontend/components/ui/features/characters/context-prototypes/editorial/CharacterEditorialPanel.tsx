@@ -1,4 +1,12 @@
+/**
+ * Character Editorial Panel: sección editorial: Character Editorial Panel.
+ */
 'use client'
+
+
+/**
+ * Sección editorial: Character Editorial Panel.
+ */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight } from 'lucide-react'

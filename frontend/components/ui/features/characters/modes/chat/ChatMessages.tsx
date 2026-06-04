@@ -5,6 +5,7 @@ import { AudioMessagePlayer } from "@/components/ui/features/characters/shared/A
 import { GenericRenderer } from "@/components/ui/features/characters/genui/GenericRenderer"
 import { ModeSwitchSeparator } from "@/components/ui/features/characters/modes/chat/ModeSwitchSeparator"
 import { TypingIndicator } from "@/components/ui/features/characters/modes/chat/TypingIndicator"
+import { MessageCopyAction } from "@/components/ui/features/characters/shared/MessageCopyAction"
 import { StreamingText } from "@/components/ui/features/characters/shared/StreamingText"
 import { useAnimatedEntryKeys } from "@/hooks/useAnimatedEntryKeys"
 
@@ -135,8 +136,12 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
                 }`}
               >
                 {msg.role === "assistant" && (
-                  <div className="flex items-center gap-1.5 mb-1">
+                  <div className="flex items-center justify-between gap-2 mb-1">
                     <span className="text-xs font-medium opacity-70">{charName}</span>
+                    <MessageCopyAction
+                      text={msg.content}
+                      className="size-6 text-secondary-foreground/60 hover:text-secondary-foreground"
+                    />
                   </div>
                 )}
                 {hasRenderableBlocks(msg) ? (

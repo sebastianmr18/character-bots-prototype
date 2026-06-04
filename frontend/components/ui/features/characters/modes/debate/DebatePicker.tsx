@@ -1,4 +1,12 @@
+/**
+ * Debate Picker: componente del modo debate: Debate Picker.
+ */
 "use client"
+
+
+/**
+ * Componente del modo debate: Debate Picker.
+ */
 
 import { useState } from "react"
 import type { Character } from "@/types/chat.types"

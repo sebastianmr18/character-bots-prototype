@@ -1,3 +1,7 @@
+/**
+ * Setup global de Jest: matchers de Testing Library y stubs de APIs de audio en jsdom.
+ */
+
 import '@testing-library/jest-dom'
 
 // HTMLMediaElement stubs (jsdom doesn't implement them)

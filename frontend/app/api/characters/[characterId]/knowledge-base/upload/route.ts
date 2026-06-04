@@ -1,3 +1,7 @@
+/**
+ * Rutas BFF /api/characters/[characterId]/knowledge-base/upload: proxifica al backend con autenticación Supabase.
+ */
+
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { hasAdminRole } from '@/lib/api/admin-authorization'
@@ -14,6 +18,11 @@ const tryParseJson = (text: string): unknown => {
   }
 }
 
+/**
+ * Crea recurso en.
+ *
+ * @returns Respuesta del proxy BFF hacia el backend.
+ */
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { characterId } = await context.params

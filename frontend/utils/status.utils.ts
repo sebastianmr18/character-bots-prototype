@@ -1,5 +1,11 @@
 import type { StatusDisplayConfig } from "../types/chat.types"
 
+/**
+ * Mapea etiquetas de estado de conexión o flujo a colores e iconos para la UI.
+ *
+ * @param status - Texto de estado mostrado al usuario (p. ej. "Conectado", "Grabando voz...").
+ * @returns Configuración visual (clases Tailwind e icono).
+ */
 export const getStatusDisplay = (status: string): StatusDisplayConfig => {
   switch (status) {
     case "Conectado":

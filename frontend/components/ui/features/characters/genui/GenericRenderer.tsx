@@ -1,3 +1,7 @@
+/**
+ * Renderiza una lista de bloques GenUI (texto y componentes registrados).
+ */
+
 import type React from "react"
 import type { MessageBlock } from "@/types/chat.types"
 import { renderRegisteredComponent } from "./component-registry"
@@ -14,6 +18,7 @@ const UnknownBlockFallback: React.FC<{ label: string }> = ({ label }) => {
   )
 }
 
+/** Itera bloques y delega en el registro de componentes o muestra fallback. */
 export const GenericRenderer: React.FC<GenericRendererProps> = ({ blocks }) => {
   return (
     <div className="flex flex-col gap-2">

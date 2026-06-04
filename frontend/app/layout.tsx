@@ -1,3 +1,7 @@
+/**
+ * Layout raíz de la aplicación Next.js (fuentes, metadatos, proveedores).
+ */
+
 import type { Metadata } from "next";
 import { Playfair_Display, Source_Sans_3 } from 'next/font/google'
 import { ThemeProvider } from "@/app/providers";

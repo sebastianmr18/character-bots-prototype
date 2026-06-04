@@ -1,3 +1,9 @@
+/**
+ * Comprueba si el token de sesión pertenece a un usuario con rol administrador.
+ *
+ * @param token - Access token JWT de Supabase.
+ * @returns `true` si el backend responde con `role: "admin"` en `/me`.
+ */
 export async function hasAdminRole(token: string): Promise<boolean> {
   if (!process.env.BACKEND_URL) {
     return false

@@ -7,9 +7,12 @@ import {
 } from '@/utils/message.utils'
 
 /**
- * Polls the conversation endpoint for new messages on a fixed interval.
- * Stops automatically when the latest assistant message has audio, or after
- * 15 iterations (~30 s). Exposed via `startPolling` and `stopPolling`.
+ * Consulta periódicamente la conversación por mensajes nuevos cuando el WebSocket no entrega audio a tiempo.
+ *
+ * @param conversationId - Conversación a sondear.
+ * @param onMessagesUpdate - Actualizador de estado de mensajes.
+ * @param onStatusChange - Callback de etiqueta de estado para la UI.
+ * @returns `startPolling` y `stopPolling`; se detiene al recibir audio del asistente o tras ~30 s.
  */
 export const useMessagePolling = (
   conversationId: string | null,

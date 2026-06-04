@@ -1,5 +1,9 @@
 "use client"
 
+/**
+ * Modal de grabación de voz con visualización de nivel y envío.
+ */
+
 import type React from "react"
 import { motion } from "framer-motion"
 import { StopCircle, X, Mic } from "lucide-react"
@@ -13,6 +17,7 @@ interface VoiceRecordingModalProps {
   onToggleRecording: () => void
 }
 
+/** Overlay para iniciar, detener y enviar una nota de voz. */
 export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
   isOpen,
   isRecording,

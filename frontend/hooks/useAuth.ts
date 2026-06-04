@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { MeProfile } from '@/types/chat.types'
 
+/** Subconjunto del usuario de Supabase usado en la cabecera de la aplicación. */
 export type HeaderUser = {
   email?: string
   user_metadata?: {
@@ -33,6 +34,11 @@ const writeCachedProfile = (profile: MeProfile | null) => {
   sessionStorage.removeItem(PROFILE_CACHE_KEY)
 }
 
+/**
+ * Gestiona sesión de Supabase, perfil (`/api/me`) y cierre de sesión con caché en `sessionStorage`.
+ *
+ * @returns Usuario de auth, perfil con rol, estado de carga, `signOut` y recarga de perfil.
+ */
 export const useAuth = () => {
   const router = useRouter()
   const [user, setUser] = useState<HeaderUser | null>(null)

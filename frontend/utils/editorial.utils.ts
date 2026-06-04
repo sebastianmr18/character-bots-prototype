@@ -1,3 +1,7 @@
+/**
+ * Normalización y fusión de contenido editorial desde respuestas del backend.
+ */
+
 import type {
   CharacterEditorial,
   CharacterEditorialSectionName,
@@ -116,6 +120,7 @@ const normalizeEditorialCharacter = (value: unknown): EditorialCharacter => {
   }
 }
 
+/** Devuelve un objeto editorial vacío con todas las colecciones inicializadas. */
 export const createEmptyEditorial = (): CharacterEditorial => ({
   quotes: [],
   facts: [],
@@ -352,6 +357,12 @@ const pickEditorialSection = (
   }, {})
 }
 
+/**
+ * Normaliza un personaje editorial desde un payload desconocido del backend.
+ *
+ * @param value - Objeto crudo; si está vacío devuelve `null`.
+ * @returns Personaje editorial o `null` si no hay datos válidos.
+ */
 export const normalizeBackendEditorialCharacter = (value: unknown): EditorialCharacter | null => {
   const record = asRecord(value)
 
@@ -362,6 +373,13 @@ export const normalizeBackendEditorialCharacter = (value: unknown): EditorialCha
   return normalizeEditorialCharacter(record)
 }
 
+/**
+ * Extrae y normaliza solo los campos editorial de una sección (hero, timeline, etc.).
+ *
+ * @param section - Nombre de la sección solicitada.
+ * @param payload - Respuesta parcial del backend.
+ * @returns Personaje opcional y subconjunto editorial ordenado.
+ */
 export const normalizeBackendEditorialSectionPayload = (
   section: CharacterEditorialSectionName,
   payload: BackendEditorialResponse,
@@ -370,6 +388,13 @@ export const normalizeBackendEditorialSectionPayload = (
   editorial: pickEditorialSection(normalizeEditorial(payload.editorial), section),
 })
 
+/**
+ * Fusiona contenido editorial entrante sobre una base existente por identificador y orden.
+ *
+ * @param base - Estado editorial actual en cliente.
+ * @param incoming - Actualización parcial (p. ej. tras recargar una sección).
+ * @returns Editorial combinado sin duplicar ids.
+ */
 export const mergeEditorialContent = (
   base: CharacterEditorial,
   incoming: Partial<CharacterEditorial>,

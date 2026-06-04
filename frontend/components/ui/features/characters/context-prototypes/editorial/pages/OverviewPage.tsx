@@ -1,4 +1,12 @@
+/**
+ * Overview Page Skeleton: sección editorial: Overview Page.
+ */
 'use client'
+
+
+/**
+ * Sección editorial: Overview Page.
+ */
 
 import { Brain, Lightbulb, Sparkles } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
