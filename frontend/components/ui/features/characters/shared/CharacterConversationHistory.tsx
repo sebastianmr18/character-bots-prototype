@@ -1,4 +1,12 @@
+/**
+ * Character Conversation History: componente o módulo Character Conversation History.
+ */
 'use client'
+
+
+/**
+ * Componente o módulo Character Conversation History.
+ */
 
 import { type ReactNode } from 'react'
 import { Clock, MessageSquare } from 'lucide-react'

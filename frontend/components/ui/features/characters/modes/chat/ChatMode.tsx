@@ -1,5 +1,9 @@
 "use client"
 
+/**
+ * Interfaz principal de chat: entrevista, llamada y debate sobre una conversación.
+ */
+
 import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
 import { VoiceRecordingModal } from "@/components/ui/features/characters/shared/VoiceRecordingModal"
@@ -12,7 +16,7 @@ import { useAudioResolver } from "@/hooks/useAudioResolver"
 import { ChatInput } from "@/components/ui/features/characters/modes/chat/ChatInput"
 import { ChatMessages } from "@/components/ui/features/characters/modes/chat/ChatMessages"
 import { ChatMessagesLoadingSkeleton } from "@/components/ui/features/skeletons/ChatMessageSkeleton"
-import { MessageSquareMore, Phone, Swords, GraduationCap } from "lucide-react"
+import { MessageSquareMore, Phone, Swords } from "lucide-react"
 import { getErrorMessage } from "@/utils/api.utils"
 import {
   Dialog,
@@ -24,7 +28,8 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 
-export type ConversationMode = "call" | "interview" | "debate" | "professor"
+/** Modos de interacción disponibles en la vista de personaje. */
+export type ConversationMode = "call" | "interview" | "debate"
 
 interface ChatInterfaceProps {
   activeMode: ConversationMode
@@ -41,9 +46,9 @@ const MODES: { id: ConversationMode; label: string; icon: React.ElementType }[] 
   { id: "interview", label: "Entrevista", icon: MessageSquareMore },
   { id: "call", label: "Llamada", icon: Phone },
   { id: "debate", label: "Debate", icon: Swords },
-  { id: "professor", label: "Profesor", icon: GraduationCap },
 ]
 
+/** Orquesta mensajes, WebSocket, grabación de voz y cambio entre modos call/debate/interview. */
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
   activeMode,
   singleConversationId,
@@ -373,18 +378,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         </>
       ) : activeMode === "call" ? (
         <CallModePanel characterId={effectiveCharacterId} onEndCall={() => onModeChange?.("interview")} />
-      ) : activeMode === "debate" ? (
+      ) : (
         <DebatePanel
           currentCharacterId={effectiveCharacterId}
           existingConversationId={debateConversationIdForPanel}
           onConversationCreated={onConversationCreated}
         />
-      ) : (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-muted-foreground text-sm">
-            {MODES.find((m) => m.id === activeMode)?.label} — Próximamente
-          </p>
-        </div>
       )}
 
       <VoiceRecordingModal

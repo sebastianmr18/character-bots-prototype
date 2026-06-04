@@ -1,4 +1,12 @@
+/**
+ * Hero Page Skeleton: sección editorial: Hero Page.
+ */
 'use client'
+
+
+/**
+ * Sección editorial: Hero Page.
+ */
 
 import Image from 'next/image'
 import { MapPin, Quote, Sparkles } from 'lucide-react'

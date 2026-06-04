@@ -1,5 +1,10 @@
 "use client"
 
+
+/**
+ * Proveedores de contexto React envolviendo la aplicación.
+ */
+
 import { createContext, useContext, useEffect, useState } from "react"
 
 type Theme = "light" | "dark"

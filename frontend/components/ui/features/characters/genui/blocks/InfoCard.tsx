@@ -1,3 +1,10 @@
+/**
+ * Parse Info Card Props: renderizado GenUI: Info Card.
+ */
+/**
+ * Renderizado GenUI: Info Card.
+ */
+
 import type React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 

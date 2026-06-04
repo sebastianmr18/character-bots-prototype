@@ -1,3 +1,10 @@
+/**
+ * Character Context Panel: componente o módulo Characters Context Panel.
+ */
+/**
+ * Componente o módulo Characters Context Panel.
+ */
+
 'use client';
 
 import { useEffect, useState } from 'react';

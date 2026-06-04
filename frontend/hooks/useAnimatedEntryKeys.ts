@@ -2,6 +2,15 @@
 
 import { useEffect, useRef, useState } from "react"
 
+/**
+ * Rastrea claves de entradas que deben animarse al aparecer por primera vez en una lista.
+ *
+ * @param entries - Elementos actuales.
+ * @param getEntryKey - Función que devuelve clave estable por entrada.
+ * @param shouldAnimateEntry - Filtra qué entradas nuevas animan.
+ * @param resetKey - Al cambiar, reinicia el conjunto de claves ya animadas.
+ * @returns Conjunto de claves pendientes de animación de entrada.
+ */
 export const useAnimatedEntryKeys = <T,>(
   entries: T[],
   getEntryKey: (entry: T) => string,

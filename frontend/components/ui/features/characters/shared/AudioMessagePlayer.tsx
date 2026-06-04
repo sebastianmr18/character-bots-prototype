@@ -1,4 +1,12 @@
+/**
+ * Audio Message Player: componente o módulo Audio Message Player.
+ */
 "use client"
+
+
+/**
+ * Componente o módulo Audio Message Player.
+ */
 
 import { useEffect, useRef, useState } from "react"
 import { Loader2, Pause, Play } from "lucide-react"

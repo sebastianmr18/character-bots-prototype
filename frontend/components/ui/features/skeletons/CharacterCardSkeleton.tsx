@@ -1,3 +1,10 @@
+/**
+ * Character Card Skeleton: esqueleto de carga para Character Card.
+ */
+/**
+ * Esqueleto de carga para Character Card.
+ */
+
 import { Skeleton } from '@/components/ui/skeleton'
 
 export function CharacterCardSkeleton() {

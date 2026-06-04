@@ -20,9 +20,11 @@ const tryParseJson = (text: string): unknown => {
 }
 
 /**
- * Proxies a request to the configured BACKEND_URL, attaching the Supabase
- * session token as Bearer authorization. Handles auth checks, BACKEND_URL
- * validation, JSON/text serialization, and 204 No Content responses.
+ * Proxifica una petición al `BACKEND_URL` configurado, adjuntando el token de sesión de Supabase como Bearer.
+ *
+ * @param options - Método HTTP, ruta en el backend, cuerpo opcional y si exige rol admin.
+ * @returns `NextResponse` con JSON, texto plano o 204 según la respuesta del backend.
+ * @remarks Valida sesión (401), `BACKEND_URL` (500), rol admin (403) y reenvía errores del backend.
  */
 export async function proxyToBackend({
   method,

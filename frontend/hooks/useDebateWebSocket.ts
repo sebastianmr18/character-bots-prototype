@@ -8,6 +8,8 @@ import type {
   DebateErrorPayload,
   DebateMessageMetadata,
   DebateRoundCompletePayload,
+  DebateSkipMetadata,
+  DebateSkipReason,
   DebateTurnSkippedPayload,
   DebateStartedPayload,
   DebateTurnPayload,
@@ -23,6 +25,7 @@ interface UseDebateWebSocketProps {
   conversationId: string | null
   onStatusChange: (status: string) => void
   fetchConversationMessages?: () => Promise<Message[] | null>
+  getSpeakerSkipMetadata?: (speakerId: string) => DebateSkipMetadata | null
 }
 
 const asDebateMetadata = (message: Message): DebateMessageMetadata | undefined => {
@@ -76,6 +79,20 @@ const createTraceScopedMessage = (
   },
 })
 
+const normalizeSkipReason = (reason: string | null | undefined): DebateSkipReason => {
+  if (
+    reason === "manual" ||
+    reason === "manual_user" ||
+    reason === "auto_low_confidence" ||
+    reason === "not_applicable" ||
+    reason === "strategy"
+  ) {
+    return reason
+  }
+
+  return "unknown"
+}
+
 const buildTurnMessage = (payload: DebateTurnPayload): Message => {
   let audioUrl: string | null = null
 
@@ -109,11 +126,15 @@ const buildTurnMessage = (payload: DebateTurnPayload): Message => {
   )
 }
 
-const buildSkippedTurnMessage = (payload: DebateTurnSkippedPayload): Message => {
+const buildSkippedTurnMessage = (
+  payload: DebateTurnSkippedPayload,
+  fallbackSkipMetadata?: DebateSkipMetadata | null,
+): Message => {
   const speakerId = payload.speaker_id ?? payload.speakerId ?? ""
   const speakerName = payload.speaker_name ?? payload.speakerName ?? ""
-  const reason = payload.reason
-  const reasonDetail = (payload.reason_detail ?? payload.reasonDetail)?.trim()
+  const reason = normalizeSkipReason(payload.reason ?? fallbackSkipMetadata?.reason)
+  const reasonDetail =
+    (payload.reason_detail ?? payload.reasonDetail ?? fallbackSkipMetadata?.reasonDetail)?.trim()
   const content = reasonDetail
     ? `${speakerName} ha pasado su turno. (${reasonDetail})`
     : `${speakerName} ha pasado su turno.`
@@ -132,12 +153,12 @@ const buildSkippedTurnMessage = (payload: DebateTurnSkippedPayload): Message => 
     },
     payload.traceId,
     {
-      turnOrder: payload.turn_order,
-      isForced: payload.is_forced ?? false,
+      turnOrder: payload.turn_order ?? fallbackSkipMetadata?.turnOrder,
+      isForced: payload.is_forced ?? fallbackSkipMetadata?.isForced ?? false,
       isSkipped: true,
       skipReason: reason,
       skipReasonDetail: reasonDetail ?? null,
-      skipConfidence: payload.confidence ?? null,
+      skipConfidence: payload.confidence ?? fallbackSkipMetadata?.confidence ?? null,
       warning: null,
     },
   )
@@ -154,10 +175,17 @@ const getDebateErrorMessage = (payload: DebateErrorPayload): string => {
   return payload.message?.trim() || fallbackByCode[payload.code] || "Ocurrió un error en la ronda de debate."
 }
 
+/**
+ * WebSocket de debate entre dos personajes: turnos, omisiones, audio y sincronización con la conversación.
+ *
+ * @param props - Id de conversación, estado, opcional de recarga de mensajes y metadatos de skip por hablante.
+ * @returns Emisores de mensaje de usuario y estado de conexión del socket de debate.
+ */
 export const useDebateWebSocket = ({
   conversationId,
   onStatusChange,
   fetchConversationMessages,
+  getSpeakerSkipMetadata,
 }: UseDebateWebSocketProps) => {
   const socketRef = useRef<Socket | null>(null)
   const hasConnectedRef = useRef(false)
@@ -447,8 +475,14 @@ export const useDebateWebSocket = ({
         activeRoundTraceIdRef.current = data.traceId
         setTypingCharacterId(null)
         setHasSkipInActiveRound(true)
-        setSkipLockedBySpeakerId(data.speaker_id)
-        setMessages((prev) => upsertMessagesById(prev, [buildSkippedTurnMessage(data)]))
+        const speakerId = data.speaker_id ?? data.speakerId
+        if (speakerId) {
+          setSkipLockedBySpeakerId(speakerId)
+        }
+        const fallbackSkipMetadata = speakerId ? getSpeakerSkipMetadata?.(speakerId) : null
+        setMessages((prev) =>
+          upsertMessagesById(prev, [buildSkippedTurnMessage(data, fallbackSkipMetadata)]),
+        )
         onStatusChange("Esperando siguiente respuesta...")
       })
 
@@ -543,7 +577,7 @@ export const useDebateWebSocket = ({
       socketRef.current?.disconnect()
       socketRef.current = null
     }
-  }, [clearRoundState, conversationId, onStatusChange, reconcileHistory])
+  }, [clearRoundState, conversationId, getSpeakerSkipMetadata, onStatusChange, reconcileHistory])
 
   const sendDebateMessage = useCallback(
     (text: string, forcedSpeakerId?: string | null) => {

@@ -4,6 +4,12 @@ import { useEffect, useState } from "react"
 import type { Character } from "@/types/chat.types"
 import { normalizeBackendCharacter } from "@/utils/message.utils"
 
+/**
+ * Obtiene un personaje por id desde la API BFF.
+ *
+ * @param characterId - Identificador del personaje; si es `null` no se consulta.
+ * @returns Personaje normalizado, carga y mensaje de error.
+ */
 export const useCharacterById = (characterId: string | null) => {
     const [character, setCharacter] = useState<Character | null>(null)
     const [isLoading, setIsLoading] = useState(true)

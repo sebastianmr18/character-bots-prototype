@@ -1,5 +1,9 @@
 "use client"
 
+/**
+ * Flujo de debate: selección del segundo personaje y apertura del panel de chat.
+ */
+
 import type React from "react"
 import { useEffect, useState } from "react"
 import type { Character } from "@/types/chat.types"
@@ -16,6 +20,7 @@ interface DebatePanelProps {
   onConversationCreated?: (conversation: { id: string; mode?: "single" | "debate" }) => void
 }
 
+/** Crea o reanuda conversación de debate y muestra `DebateChatPanel`. */
 export const DebatePanel: React.FC<DebatePanelProps> = ({
   currentCharacterId,
   existingConversationId = null,

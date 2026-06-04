@@ -117,6 +117,14 @@ const fetchEditorialSection = async (
   return request
 }
 
+/**
+ * Carga una sección editorial del personaje con caché en memoria y `sessionStorage`.
+ *
+ * @param characterId - Id del personaje.
+ * @param section - Sección (`hero`, `overview`, `timeline`, etc.).
+ * @param enabled - Si es `false`, no dispara la petición.
+ * @returns Datos normalizados, carga, error y función de reintento.
+ */
 export const useCharacterEditorialSection = (
   characterId: string | null,
   section: CharacterEditorialSectionName,

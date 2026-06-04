@@ -1,4 +1,12 @@
+/**
+ * Conversation Page Skeleton: sección editorial: Conversation Page.
+ */
 'use client'
+
+
+/**
+ * Sección editorial: Conversation Page.
+ */
 
 import { Atom, MessageSquare, Sparkles } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'

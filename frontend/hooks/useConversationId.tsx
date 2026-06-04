@@ -16,6 +16,13 @@ interface UseConversationOptions {
 const normalizeConversationMode = (mode?: Conversation['mode']) =>
     mode === 'debate' ? 'debate' : 'single'
 
+/**
+ * Carga mensajes y personaje de una conversación existente.
+ *
+ * @param initialConversationId - Id de conversación o `null` para estado vacío.
+ * @param options - Modo esperado (`single` / `debate`) para validar compatibilidad.
+ * @returns Mensajes, personaje, modo, referencias y banderas de carga o incompatibilidad.
+ */
 export const useConversation = (initialConversationId: string | null, options: UseConversationOptions = {}) => {
     const conversationId = initialConversationId
     const expectedMode = options.expectedMode

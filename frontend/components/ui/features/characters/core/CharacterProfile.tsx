@@ -1,4 +1,12 @@
+/**
+ * Character Profile: componente o módulo Character Profile.
+ */
 'use client'
+
+
+/**
+ * Componente o módulo Character Profile.
+ */
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'

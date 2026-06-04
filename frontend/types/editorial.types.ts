@@ -1,5 +1,10 @@
+/**
+ * Tipos del contenido editorial de personajes (hero, timeline, galería, etc.).
+ */
+
 import type { Character } from '@/types/chat.types'
 
+/** Personaje con campos adicionales usados en paneles editoriales y administración. */
 export interface EditorialCharacter extends Character {
   keyTraits?: string[] | null
   speechTics?: unknown[] | null
@@ -13,6 +18,7 @@ export interface EditorialCharacter extends Character {
   isPublic?: boolean
 }
 
+/** Cita destacada asociada al personaje. */
 export interface EditorialQuote {
   id: string
   text: string
@@ -21,6 +27,7 @@ export interface EditorialQuote {
   isFeatured: boolean
 }
 
+/** Dato factual etiquetado (ficha, estadística, etc.). */
 export interface EditorialFact {
   id: string
   label: string
@@ -29,6 +36,7 @@ export interface EditorialFact {
   sortOrder: number
 }
 
+/** Tarjeta de contexto narrativo en una sección editorial. */
 export interface EditorialContextCard {
   id: string
   eyebrow: string | null
@@ -39,6 +47,7 @@ export interface EditorialContextCard {
   sortOrder: number
 }
 
+/** Relación entre personajes o figuras históricas vinculadas. */
 export interface EditorialRelationship {
   id: string
   name: string
@@ -47,6 +56,7 @@ export interface EditorialRelationship {
   sortOrder: number
 }
 
+/** Entrada de línea temporal con relaciones anidadas opcionales. */
 export interface EditorialTimelineEntry {
   id: string
   yearLabel: string
@@ -58,6 +68,7 @@ export interface EditorialTimelineEntry {
   relationships: EditorialRelationship[]
 }
 
+/** Prompt sugerido para iniciar conversación desde el panel editorial. */
 export interface EditorialPrompt {
   id: string
   label: string | null
@@ -67,6 +78,7 @@ export interface EditorialPrompt {
   sortOrder: number
 }
 
+/** Imagen de galería con metadatos de accesibilidad y crédito. */
 export interface EditorialGalleryImage {
   id: string
   imageUrl: string
@@ -78,6 +90,7 @@ export interface EditorialGalleryImage {
   isCover: boolean
 }
 
+/** Bloque de texto libre agrupado por clave y página. */
 export interface EditorialBlock {
   id: string
   blockKey: string
@@ -87,6 +100,7 @@ export interface EditorialBlock {
   sortOrder: number
 }
 
+/** Texto de interfaz configurable (copys por página). */
 export interface EditorialUiCopy {
   copyKey: string
   text: string
@@ -95,6 +109,7 @@ export interface EditorialUiCopy {
   source: string | null
 }
 
+/** Conjunto completo de contenido editorial de un personaje. */
 export interface CharacterEditorial {
   quotes: EditorialQuote[]
   facts: EditorialFact[]
@@ -107,13 +122,16 @@ export interface CharacterEditorial {
   uiCopies: EditorialUiCopy[]
 }
 
+/** Respuesta del backend con personaje y bloque editorial completo. */
 export interface CharacterEditorialResponse {
   character: EditorialCharacter
   editorial: CharacterEditorial
 }
 
+/** Secciones editoriales que pueden cargarse de forma parcial (lazy). */
 export type CharacterEditorialSectionName = 'hero' | 'overview' | 'timeline' | 'relations' | 'gallery'
 
+/** Respuesta parcial al solicitar una sola sección editorial. */
 export interface CharacterEditorialSectionResponse {
   character?: EditorialCharacter
   editorial: Partial<CharacterEditorial>

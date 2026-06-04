@@ -1,4 +1,12 @@
+/**
+ * Footer: componente o módulo Footer.
+ */
 "use client"
+
+
+/**
+ * Componente o módulo Footer.
+ */
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
