@@ -74,7 +74,7 @@ export function EditorialQuotesTab({ characterId, items, onRefresh }: Props) {
       {items.length === 0 && <p className="text-sm text-muted-foreground">Sin citas aún.</p>}
       {items.map((item) => (
         <div key={item.id} className="flex items-start justify-between rounded border p-2 text-sm">
-          <div><p className="font-medium">"{item.text}"</p>{item.attribution && <p className="text-muted-foreground">— {item.attribution}</p>}</div>
+          <div><p className="font-medium">&quot;{item.text}&quot;</p>{item.attribution && <p className="text-muted-foreground">— {item.attribution}</p>}</div>
           <div className="flex gap-1 ml-2 shrink-0">
             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(item)}><Pencil className="h-3 w-3" /></Button>
             <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeletingId(item.id)}><Trash2 className="h-3 w-3" /></Button>
