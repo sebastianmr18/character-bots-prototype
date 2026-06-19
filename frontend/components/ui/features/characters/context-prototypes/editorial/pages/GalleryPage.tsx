@@ -80,14 +80,25 @@ export function GalleryPage({
           <div className="overflow-hidden rounded-[20px] border border-border bg-background">
             <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
               {activeImage ? (
-                <Image
-                  src={activeImage.imageUrl}
-                  alt={activeImage.alt ?? characterName}
-                  fill
-                  unoptimized
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                  className="object-cover"
-                />
+                <>
+                  {/* Imagen de fondo con blur */}
+                  <Image
+                    src={activeImage.imageUrl}
+                    alt=""
+                    fill
+                    unoptimized
+                    className="object-cover blur-md opacity-35 scale-105 pointer-events-none"
+                  />
+                  {/* Imagen principal contenida sin recortar */}
+                  <Image
+                    src={activeImage.imageUrl}
+                    alt={activeImage.alt ?? characterName}
+                    fill
+                    unoptimized
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    className="object-contain z-10"
+                  />
+                </>
               ) : (
                 <div className="flex h-full items-center justify-center px-6 text-center text-[13px] text-muted-foreground">
                   No hay imágenes editoriales cargadas para este personaje.
