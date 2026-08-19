@@ -9,8 +9,9 @@
  */
 
 import Image from "next/image"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Mic, MicOff, Pause, Play, Phone, PhoneOff } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { motion } from "framer-motion"
+import { Mic, MicOff, Phone, PhoneOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useCharacterById } from "@/hooks/useCharacterById"
 import { useBackendLive } from "@/hooks/useBackendLive"
@@ -30,16 +31,15 @@ const formatDuration = (seconds: number) => {
   return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
 }
 
-const getConnectionLabel = (status: ConnectionStatus, isPaused: boolean) => {
+const getConnectionLabel = (status: ConnectionStatus) => {
   if (status === ConnectionStatus.CONNECTING) return "Conectando"
   if (status === ConnectionStatus.ERROR) return "Error"
   if (status !== ConnectionStatus.CONNECTED) return "Desconectada"
-  return isPaused ? "Pausada" : "Activa"
+  return "Activa"
 }
 
 const getSceneCopy = (
   status: ConnectionStatus,
-  isPaused: boolean,
   isMuted: boolean,
   isSearching: boolean,
   characterName: string,
@@ -62,13 +62,6 @@ const getSceneCopy = (
     return {
       title: `Listo para hablar con ${characterName}`,
       description: "Inicia la llamada para conversar por voz y ver la transcripcion en vivo.",
-    }
-  }
-
-  if (isPaused) {
-    return {
-      title: "Llamada en pausa",
-      description: "El microfono esta silenciado hasta que reanudes la conversacion.",
     }
   }
 
@@ -114,42 +107,58 @@ Comportamiento:
 - Intenta ser conversacional y natural`
 }
 
+function VoiceVisualizer({ isActive, isUser }: { isActive: boolean; isUser?: boolean }) {
+  return (
+    <div className="flex items-center gap-[3px] h-4">
+      {[0, 1, 2, 3].map((i) => (
+        <motion.div
+          key={i}
+          className={`w-1 rounded-full ${isUser ? "bg-primary" : "bg-foreground"}`}
+          initial={{ height: "4px" }}
+          animate={{
+            height: isActive ? ["4px", "14px", "6px", "16px", "4px"] : "4px",
+          }}
+          transition={{
+            duration: 0.8,
+            repeat: isActive ? Infinity : 0,
+            repeatType: "mirror",
+            ease: "easeInOut",
+            delay: i * 0.1,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 export function CallModePanel({ characterId, onEndCall }: CallModePanelProps) {
-  const [isPaused, setIsPaused] = useState(false)
   const [callDuration, setCallDuration] = useState(0)
-  const mutedBeforePauseRef = useRef(false)
 
   const { character, isLoading, error } = useCharacterById(characterId)
   const systemInstruction = useMemo(() => buildSystemInstruction(character), [character])
 
-  const { status, history, isMuted, setIsMuted, connect, disconnect, isSearching } = useBackendLive(
+  const { status, history, isMuted, setIsMuted, connect, disconnect, isSearching, isModelSpeaking } = useBackendLive(
     systemInstruction,
     characterId ?? ""
   )
 
   const isConnected = status === ConnectionStatus.CONNECTED
   const canConnect = Boolean(characterId && character)
-  const connectionLabel = getConnectionLabel(status, isPaused)
-  const sceneCopy = getSceneCopy(status, isPaused, isMuted, isSearching, character?.name ?? "el personaje")
+  const connectionLabel = getConnectionLabel(status)
+  const sceneCopy = getSceneCopy(status, isMuted, isSearching, character?.name ?? "el personaje")
   const themeColor = character?.themeColor ?? "rgba(59, 130, 246, 0.85)"
   const themeColorLight = character?.themeColorLight ?? "rgba(59, 130, 246, 0.18)"
   const avatarInitial = character?.name.charAt(0).toUpperCase() ?? "?"
 
   useEffect(() => {
-    if (!isConnected || isPaused) return
+    if (!isConnected) return
 
     const interval = setInterval(() => {
       setCallDuration((prev) => prev + 1)
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [isConnected, isPaused])
-
-  useEffect(() => {
-    if (status !== ConnectionStatus.CONNECTED) {
-      setIsPaused(false)
-    }
-  }, [status])
+  }, [isConnected])
 
   useEffect(() => {
     return () => {
@@ -173,19 +182,6 @@ export function CallModePanel({ characterId, onEndCall }: CallModePanelProps) {
     prefix: item.role === "user" ? "Tú" : (character?.name ?? "Personaje"),
   }))
 
-  const handleTogglePause = () => {
-    const nextPaused = !isPaused
-    setIsPaused(nextPaused)
-
-    if (nextPaused) {
-      mutedBeforePauseRef.current = isMuted
-      setIsMuted(true)
-      return
-    }
-
-    setIsMuted(mutedBeforePauseRef.current)
-  }
-
   const handleConnect = async () => {
     if (!canConnect || status === ConnectionStatus.CONNECTING) return
     setCallDuration(0)
@@ -195,7 +191,6 @@ export function CallModePanel({ characterId, onEndCall }: CallModePanelProps) {
   const handleEndCall = async () => {
     await disconnect()
     setCallDuration(0)
-    setIsPaused(false)
     onEndCall()
   }
 
@@ -246,13 +241,29 @@ export function CallModePanel({ characterId, onEndCall }: CallModePanelProps) {
               <span className="rounded-full border border-border bg-muted/70 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                 {character.role}
               </span>
+              {character.years ? (
+                <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 text-[11px] text-muted-foreground">
+                  {character.years}
+                </span>
+              ) : null}
+              {character.category ? (
+                <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 text-[11px] text-muted-foreground">
+                  {character.category}
+                </span>
+              ) : null}
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {isConnected ? `En llamada desde ${formatDuration(callDuration)}` : "Llamada de voz con transcripcion en vivo"}
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              <span className="font-medium text-foreground mr-1">{sceneCopy.title}</span>
+              <span className="hidden sm:inline">— {sceneCopy.description}</span>
             </p>
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
+            {isConnected ? (
+              <span className="rounded-full border border-border bg-muted/70 px-3 py-1 text-xs font-medium text-foreground">
+                {formatDuration(callDuration)}
+              </span>
+            ) : null}
             {isMuted ? (
               <span className="rounded-full border border-border bg-muted/70 px-3 py-1 text-xs text-muted-foreground">
                 Microfono apagado
@@ -272,131 +283,80 @@ export function CallModePanel({ characterId, onEndCall }: CallModePanelProps) {
           </div>
         </div>
 
-        <div className="grid flex-1 min-h-0 gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] lg:gap-5">
-          <div className="flex min-h-[320px] flex-col items-center justify-center rounded-[2rem] border border-border bg-card/80 px-6 py-8 text-center shadow-sm backdrop-blur-md sm:px-8">
-            <div className="relative mb-6">
-              {(isConnected || status === ConnectionStatus.CONNECTING) && !isPaused ? (
-                <>
-                  <div className="absolute inset-0 -m-5 rounded-full border border-primary/25 animate-ping" />
-                  <div className="absolute inset-0 -m-10 rounded-full border border-primary/15 animate-ping [animation-delay:400ms]" />
-                </>
-              ) : null}
-
-              <div
-                className="relative h-36 w-36 overflow-hidden rounded-full border-4 border-background shadow-[0_18px_45px_rgba(0,0,0,0.16)] dark:shadow-[0_18px_45px_rgba(0,0,0,0.35)] sm:h-44 sm:w-44"
-                style={{ backgroundColor: themeColor }}
-              >
-                {character.imageUrl ? (
-                  <Image
-                    src={character.imageUrl}
-                    alt={character.name}
-                    fill
-                    unoptimized
-                    sizes="176px"
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <span className="text-5xl font-bold text-primary-foreground sm:text-6xl">{avatarInitial}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="max-w-xl space-y-3">
-              <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Modo llamada</p>
-              <h3 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{sceneCopy.title}</h3>
-              <p className="mx-auto max-w-md text-sm leading-6 text-muted-foreground sm:text-base">
-                {sceneCopy.description}
-              </p>
-            </div>
-
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5 text-xs text-muted-foreground">
-              {character.years ? (
-                <span className="rounded-full border border-border bg-muted/60 px-3 py-1.5">{character.years}</span>
-              ) : null}
-              {character.category ? (
-                <span className="rounded-full border border-border bg-muted/60 px-3 py-1.5">{character.category}</span>
-              ) : null}
-            </div>
-
-            <p className="mt-5 max-w-lg text-sm leading-6 text-muted-foreground line-clamp-3">{character.biography}</p>
-
-            {!isConnected ? (
-              <Button
-                size="lg"
-                onClick={handleConnect}
-                disabled={!canConnect || status === ConnectionStatus.CONNECTING}
-                className="mt-6 rounded-full px-8 text-base shadow-lg"
-              >
-                <Phone className="h-4 w-4" />
-                {status === ConnectionStatus.CONNECTING ? "Conectando..." : "Iniciar llamada"}
-              </Button>
-            ) : null}
-          </div>
-
-          <div className="flex min-h-0 flex-col gap-4">
-            <div className="rounded-2xl border border-border bg-card/85 p-4 shadow-sm backdrop-blur-md sm:p-5">
-              <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Estado actual</p>
-              <div className="mt-3 space-y-3">
-                <div className="rounded-xl border border-border bg-muted/40 p-3">
-                  <p className="text-sm font-medium text-foreground">{connectionLabel}</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{sceneCopy.description}</p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-border bg-muted/40 p-3">
-                    <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Microfono</p>
-                    <p className="mt-1 text-sm text-foreground">{isMuted ? "Silenciado" : "Activo"}</p>
-                  </div>
-                  <div className="rounded-xl border border-border bg-muted/40 p-3">
-                    <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Duracion</p>
-                    <p className="mt-1 text-sm text-foreground">{formatDuration(callDuration)}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-border bg-card/85 p-4 shadow-sm backdrop-blur-md sm:p-5">
-              <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex flex-1 min-h-0 flex-col gap-4">
+          <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-border bg-card/85 p-4 shadow-sm backdrop-blur-md sm:p-6">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-4">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Transcripcion en tiempo real</p>
                   <p className="mt-1 text-sm text-muted-foreground">Ultimos intercambios de la llamada.</p>
                 </div>
-                <span className="rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
-                  {transcriptLines.length} lineas
-                </span>
+                {isConnected && isModelSpeaking ? (
+                   <div className="flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1.5">
+                     <VoiceVisualizer isActive={true} />
+                     <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-foreground">{character.name} hablando</span>
+                   </div>
+                ) : isConnected && !isMuted && !isSearching ? (
+                   <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5">
+                     <VoiceVisualizer isActive={true} isUser={true} />
+                     <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-primary">Micrófono abierto</span>
+                   </div>
+                ) : null}
               </div>
+              <span className="rounded-full border border-border bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground">
+                {transcriptLines.length} lineas
+              </span>
+            </div>
 
-              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-                {transcriptLines.length > 0 ? (
-                  transcriptLines.map((item) => {
-                    const isUser = item.role === "user"
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-2">
+              {transcriptLines.length > 0 ? (
+                transcriptLines.map((item) => {
+                  const isUser = item.role === "user"
 
-                    return (
-                      <div
-                        key={getTranscriptAnimationKey(item)}
-                        className={`rounded-2xl border p-3 text-sm leading-6 ${
-                          isUser
-                            ? "ml-6 border-primary/15 bg-primary/10 text-foreground"
-                            : "mr-6 border-border bg-muted/35 text-foreground"
-                        }`}
-                      >
-                        <p className="mb-1 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{item.prefix}</p>
-                        <StreamingText
-                          text={item.text}
-                          animate={animatedTranscriptKeys.has(getTranscriptAnimationKey(item))}
-                        />
+                  return (
+                    <div
+                      key={getTranscriptAnimationKey(item)}
+                      className={`rounded-2xl border p-4 text-sm leading-relaxed ${
+                        isUser
+                          ? "ml-8 lg:ml-16 border-primary/15 bg-primary/10 text-foreground"
+                          : "mr-8 lg:mr-16 border-border bg-muted/35 text-foreground"
+                      }`}
+                    >
+                      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{item.prefix}</p>
+                      <StreamingText
+                        text={item.text}
+                        animate={animatedTranscriptKeys.has(getTranscriptAnimationKey(item))}
+                      />
+                    </div>
+                  )
+                })
+              ) : (
+                <div className="flex h-full min-h-64 flex-col items-center justify-center gap-6 rounded-2xl border border-dashed border-border bg-muted/25 p-8 text-center">
+                  {!isConnected ? (
+                    <>
+                      <div className="max-w-md space-y-2">
+                        <p className="text-base font-medium text-foreground">Listo para hablar con {character.name}</p>
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          Inicia la llamada para conversar por voz. Aquí verás la transcripción en tiempo real de todo lo que hablen.
+                        </p>
                       </div>
-                    )
-                  })
-                ) : (
-                  <div className="flex h-full min-h-40 items-center justify-center rounded-2xl border border-dashed border-border bg-muted/25 p-6 text-center">
-                    <p className="max-w-xs text-sm leading-6 text-muted-foreground">
-                      Aun no hay transcripciones. Cuando empiece la llamada, aqui veras el ida y vuelta en tiempo real.
+                      <Button
+                        size="lg"
+                        onClick={handleConnect}
+                        disabled={!canConnect || status === ConnectionStatus.CONNECTING}
+                        className="rounded-full px-8 text-base shadow-lg"
+                      >
+                        <Phone className="h-4 w-4" />
+                        {status === ConnectionStatus.CONNECTING ? "Conectando..." : "Iniciar llamada"}
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
+                      Aun no hay transcripciones. Empieza a hablar y aqui veras el ida y vuelta en tiempo real.
                     </p>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -414,19 +374,6 @@ export function CallModePanel({ characterId, onEndCall }: CallModePanelProps) {
                 {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
               </Button>
               <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{isMuted ? "Activar" : "Silenciar"}</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-2">
-              <Button
-                size="icon-lg"
-                variant="outline"
-                className="rounded-full border-border bg-background text-foreground hover:bg-muted"
-                onClick={handleTogglePause}
-                disabled={!isConnected}
-              >
-                {isPaused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
-              </Button>
-              <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{isPaused ? "Reanudar" : "Pausar"}</span>
             </div>
 
             <div className="flex flex-col items-center gap-2">

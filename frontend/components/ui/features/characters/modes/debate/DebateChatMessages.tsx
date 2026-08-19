@@ -188,10 +188,9 @@ export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
                 )}
               </div>
 
-              {/* Bubble */}
               <div
                 className={`rounded-2xl px-4 py-3 ${isCharA ? "rounded-bl-md" : "rounded-br-md"}`}
-                style={{ backgroundColor: themeColorLight }}
+                style={{ backgroundColor: `color-mix(in srgb, ${themeColor} 15%, transparent)` }}
               >
                 <div className="flex justify-end -mt-1 -mr-1 mb-1">
                   <MessageCopyAction
@@ -264,7 +263,7 @@ export const DebateChatMessages: React.FC<DebateChatMessagesProps> = ({
 
             <div
               className={`rounded-2xl px-4 py-3 ${typingSpeaker.id === characterA.id ? "rounded-bl-md" : "rounded-br-md"}`}
-              style={{ backgroundColor: getThemeColorLight(typingSpeaker) }}
+              style={{ backgroundColor: `color-mix(in srgb, ${getThemeColor(typingSpeaker)} 15%, transparent)` }}
             >
               <div className="flex items-center gap-2 text-foreground/70">
                 <span className="text-xs">{getShortName(typingSpeaker)} está pensando</span>

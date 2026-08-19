@@ -19,6 +19,7 @@ export const useBackendLive = (systemInstruction: string, characterId: string) =
   const [history, setHistory] = useState<Transcription[]>([])
   const [isMuted, setIsMuted] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
+  const [isModelSpeaking, setIsModelSpeaking] = useState(false)
   const isMutedRef = useRef(false)
 
   const { contextRef: inputContextRef, init: initInputAudio } = useAudioContext(
@@ -68,8 +69,13 @@ export const useBackendLive = (systemInstruction: string, characterId: string) =
     nextStartTimeRef.current = startTime + audioBuffer.duration
 
     activeSourcesRef.current.push(source)
+    setIsModelSpeaking(true)
+    
     source.onended = () => {
       activeSourcesRef.current = activeSourcesRef.current.filter((s) => s !== source)
+      if (activeSourcesRef.current.length === 0) {
+        setIsModelSpeaking(false)
+      }
     }
   }, [outputContextRef])
 
@@ -79,6 +85,7 @@ export const useBackendLive = (systemInstruction: string, characterId: string) =
     }
     activeSourcesRef.current = []
     nextStartTimeRef.current = 0
+    setIsModelSpeaking(false)
   }, [])
 
   const handleSetIsMuted = useCallback((value: boolean) => {
@@ -244,5 +251,6 @@ export const useBackendLive = (systemInstruction: string, characterId: string) =
     connect,
     disconnect,
     isSearching,
+    isModelSpeaking,
   }
 }

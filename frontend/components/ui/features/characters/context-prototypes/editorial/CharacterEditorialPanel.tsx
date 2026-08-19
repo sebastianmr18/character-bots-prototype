@@ -328,7 +328,7 @@ export function CharacterEditorialPanel({
             <h2 className="text-sm font-semibold text-foreground">{currentPage.title}</h2>
             <p className="mt-1 text-[13px] leading-5 text-muted-foreground">{currentPage.description}</p>
           </div>
-          <div className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
+          <div className="shrink-0 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
             {currentPageIndex + 1} / {pages.length}
           </div>
         </div>

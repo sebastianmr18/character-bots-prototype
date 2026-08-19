@@ -196,6 +196,7 @@ export default function CharacterProfile({ character }: CharacterProfileProps) {
         <div
           className={cn(
             'relative flex flex-col overflow-hidden border-t border-border lg:min-h-0 lg:border-l lg:border-t-0 lg:transition-all lg:duration-300',
+            'max-h-[400px] lg:h-[calc(100vh-6rem)] lg:max-h-none',
             isHistoryOpen ? 'lg:w-[15%] lg:opacity-100' : 'lg:w-0 lg:opacity-0 lg:pointer-events-none',
           )}
           aria-hidden={!isHistoryOpen}
