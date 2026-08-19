@@ -43,6 +43,7 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
   const [forcedSpeakerId, setForcedSpeakerId] = useState<string | null>(null)
   const [showVoiceModal, setShowVoiceModal] = useState(false)
   const [isSendingAudio, setIsSendingAudio] = useState(false)
+  const [isTurnControlOpen, setIsTurnControlOpen] = useState(false)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -330,89 +331,100 @@ export const DebateChatPanel: React.FC<DebateChatPanelProps> = ({
 
       {/* Input */}
       <div className="border-t border-border p-4 shrink-0">
-        <div className="mb-3 rounded-xl border border-border/70 bg-muted/30 p-3 space-y-3">
-          <p className="text-xs font-medium text-foreground/80">Control de turnos (próxima ronda)</p>
+        <div className="mb-3 rounded-xl border border-border/70 bg-muted/30 p-3">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between text-left"
+            onClick={() => setIsTurnControlOpen(!isTurnControlOpen)}
+          >
+            <p className="text-xs font-medium text-foreground/80">Control de turnos (próxima ronda)</p>
+            <span className="text-xs text-muted-foreground">{isTurnControlOpen ? "Ocultar" : "Mostrar"}</span>
+          </button>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <Button
-              type="button"
-              variant={forcedSpeakerId === null ? "default" : "outline"}
-              size="sm"
-              disabled={controlsDisabled}
-              onClick={() => setForcedSpeakerId(null)}
-            >
-              Alternar automático
-            </Button>
-            <Button
-              type="button"
-              variant={forcedSpeakerId === characterA.id ? "default" : "outline"}
-              size="sm"
-              disabled={controlsDisabled}
-              onClick={() => setForcedSpeakerId(characterA.id)}
-            >
-              {getShortName(characterA)} luego {getShortName(characterB)}
-            </Button>
-            <Button
-              type="button"
-              variant={forcedSpeakerId === characterB.id ? "default" : "outline"}
-              size="sm"
-              disabled={controlsDisabled}
-              onClick={() => setForcedSpeakerId(characterB.id)}
-            >
-              {getShortName(characterB)} luego {getShortName(characterA)}
-            </Button>
-          </div>
+          {isTurnControlOpen && (
+            <div className="mt-3 space-y-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <Button
+                  type="button"
+                  variant={forcedSpeakerId === null ? "default" : "outline"}
+                  size="sm"
+                  disabled={controlsDisabled}
+                  onClick={() => setForcedSpeakerId(null)}
+                >
+                  Alternar automático
+                </Button>
+                <Button
+                  type="button"
+                  variant={forcedSpeakerId === characterA.id ? "default" : "outline"}
+                  size="sm"
+                  disabled={controlsDisabled}
+                  onClick={() => setForcedSpeakerId(characterA.id)}
+                >
+                  {getShortName(characterA)} luego {getShortName(characterB)}
+                </Button>
+                <Button
+                  type="button"
+                  variant={forcedSpeakerId === characterB.id ? "default" : "outline"}
+                  size="sm"
+                  disabled={controlsDisabled}
+                  onClick={() => setForcedSpeakerId(characterB.id)}
+                >
+                  {getShortName(characterB)} luego {getShortName(characterA)}
+                </Button>
+              </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={controlsDisabled}
-              onClick={() => setForcedSpeakerId(characterA.id)}
-            >
-              Dar la palabra a {getShortName(characterA)}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={controlsDisabled}
-              onClick={() => setForcedSpeakerId(characterB.id)}
-            >
-              Dar la palabra a {getShortName(characterB)}
-            </Button>
-          </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={controlsDisabled}
+                  onClick={() => setForcedSpeakerId(characterA.id)}
+                >
+                  Dar la palabra a {getShortName(characterA)}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={controlsDisabled}
+                  onClick={() => setForcedSpeakerId(characterB.id)}
+                >
+                  Dar la palabra a {getShortName(characterB)}
+                </Button>
+              </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={skipControlsDisabled}
-              onClick={() => handleSkip(characterA.id)}
-            >
-              <MicOff className="h-4 w-4 mr-1" />
-              {getShortName(characterA)} pasa turno
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={skipControlsDisabled}
-              onClick={() => handleSkip(characterB.id)}
-            >
-              <MicOff className="h-4 w-4 mr-1" />
-              {getShortName(characterB)} pasa turno
-            </Button>
-          </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={skipControlsDisabled}
+                  onClick={() => handleSkip(characterA.id)}
+                >
+                  <MicOff className="h-4 w-4 mr-1" />
+                  {getShortName(characterA)} pasa turno
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={skipControlsDisabled}
+                  onClick={() => handleSkip(characterB.id)}
+                >
+                  <MicOff className="h-4 w-4 mr-1" />
+                  {getShortName(characterB)} pasa turno
+                </Button>
+              </div>
 
-          {hasSkipInActiveRound && (
-            <p className="text-xs text-muted-foreground">
-              {skippedSpeakerName
-                ? `${skippedSpeakerName} ya pasó su turno en esta ronda. Envía una intervención para continuar.`
-                : "Ya se pasó un turno en esta ronda. Envía una intervención para continuar."}
-            </p>
+              {hasSkipInActiveRound && (
+                <p className="text-xs text-muted-foreground">
+                  {skippedSpeakerName
+                    ? `${skippedSpeakerName} ya pasó su turno en esta ronda. Envía una intervención para continuar.`
+                    : "Ya se pasó un turno en esta ronda. Envía una intervención para continuar."}
+                </p>
+              )}
+            </div>
           )}
         </div>
 

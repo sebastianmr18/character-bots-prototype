@@ -92,9 +92,6 @@ export function ConversationPage({
           <Card className="gap-0 rounded-[24px] border-border/70 bg-card py-0 shadow-sm">
             <CardContent className="px-4 py-4">
               <div className="flex items-start gap-3.5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white" style={{ backgroundColor: themeColor }}>
-                  <Atom className="h-5 w-5" />
-                </div>
                 <div>
                   {conversationCards[0].eyebrow ? (
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{conversationCards[0].eyebrow}</p>
