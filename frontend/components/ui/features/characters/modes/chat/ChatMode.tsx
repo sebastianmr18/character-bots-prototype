@@ -27,6 +27,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { SystemPromptViewer } from "@/components/ui/features/characters/shared/SystemPromptViewer"
 
 /** Modos de interacción disponibles en la vista de personaje. */
 export type ConversationMode = "call" | "interview" | "debate"
@@ -306,21 +307,28 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] overflow-hidden border border-border rounded-xl">
       {/* Mode Selector Tabs */}
-      <div className="border-b border-border px-4 py-2 flex gap-1 overflow-x-auto shrink-0">
-        {MODES.map((m) => (
-          <button
-            key={m.id}
-            onClick={() => handleModeClick(m.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-              activeMode === m.id
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
-            }`}
-          >
-            <m.icon className="h-4 w-4" />
-            {m.label}
-          </button>
-        ))}
+      <div className="border-b border-border px-4 py-2 flex items-center gap-1 overflow-x-auto shrink-0">
+        <div className="flex gap-1">
+          {MODES.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => handleModeClick(m.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                activeMode === m.id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
+              }`}
+            >
+              <m.icon className="h-4 w-4" />
+              {m.label}
+            </button>
+          ))}
+        </div>
+        <SystemPromptViewer
+          characterId={effectiveCharacterId}
+          mode={activeMode}
+          characterName={effectiveCharacterName}
+        />
       </div>
 
       {/* Content area */}
